@@ -2,108 +2,125 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Artifice Protocol V3 — Cognitive Triad</title>
+    <title>Artifice Protocol V4 — Recursive Seed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #020302; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #010201; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
 
         #container { display: flex; width: 100vw; height: 100vh; }
 
-        /* CRT overlay */
+        /* CRT scanline */
         #canvas-container::after {
-            content: ""; display: block; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.18) 50%),
-                        linear-gradient(90deg, rgba(255,0,0,0.04), rgba(0,255,0,0.02), rgba(0,0,255,0.04));
+            content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+            background: linear-gradient(rgba(0,0,0,0) 50%, rgba(0,0,0,0.15) 50%),
+                        linear-gradient(90deg, rgba(255,0,0,0.03), rgba(0,255,0,0.015), rgba(0,0,255,0.03));
             background-size: 100% 2px, 3px 100%;
-            z-index: 2; pointer-events: none;
         }
-
         #canvas-container { flex: 2; position: relative; }
 
+        /* ── RIGHT PANEL ── */
         #ui-layer {
-            flex: 1; min-width: 320px; border-left: 1px solid #00ff4144;
-            display: flex; flex-direction: column; background: #010901;
+            flex: 0 0 340px; display: flex; flex-direction: column;
+            background: #010901; border-left: 1px solid #00ff4133;
         }
 
-        /* Monitor panel — top third */
+        /* Neural monitor */
         #neuron-monitor {
-            flex: 0 0 auto; padding: 8px 10px; font-size: 10px;
-            border-bottom: 1px solid #00ff4133; white-space: pre;
-            line-height: 1.5; color: #00cc33;
+            flex: 0 0 auto; padding: 7px 10px; font-size: 10px; line-height: 1.55;
+            border-bottom: 1px solid #00ff4122; color: #00bb2d; white-space: pre;
         }
 
-        /* Goal/Knowledge panel — middle strip */
+        /* Mutation log strip */
+        #mutation-log {
+            flex: 0 0 auto; max-height: 56px; overflow-y: auto;
+            padding: 4px 10px; font-size: 9px; color: #ff9900;
+            border-bottom: 1px solid #ff990033; line-height: 1.4;
+        }
+
+        /* Cognition panel */
         #cognition-panel {
-            flex: 0 0 auto; padding: 6px 10px; font-size: 10px;
-            border-bottom: 1px solid #00ff4133; color: #00aaff;
-            line-height: 1.5; white-space: pre-wrap; max-height: 110px;
-            overflow-y: auto;
+            flex: 0 0 auto; padding: 5px 10px; font-size: 9px;
+            border-bottom: 1px solid #00ff4122; color: #0099dd;
+            white-space: pre-wrap; max-height: 100px; overflow-y: auto; line-height: 1.45;
         }
 
-        /* Chat — bottom half */
-        #chat-area { flex: 1; display: flex; flex-direction: column; padding: 8px; min-height: 0; }
-        #messages { flex: 1; overflow-y: auto; margin-bottom: 6px; font-size: 12px; line-height: 1.6; }
+        /* Chat */
+        #chat-area { flex: 1; display: flex; flex-direction: column; padding: 7px; min-height: 0; }
+        #messages { flex: 1; overflow-y: auto; font-size: 12px; line-height: 1.6; margin-bottom: 5px; }
 
-        input[type="text"] {
-            background: #000; border: 1px solid #00ff4166; color: #00ff41;
-            padding: 8px 10px; outline: none; width: 100%;
-            font-family: 'Courier New', monospace; font-size: 12px;
+        .input-row { display: flex; gap: 4px; }
+        #userInput {
+            flex: 1; background: #000; border: 1px solid #00ff4155; color: #00ff41;
+            padding: 8px; font-family: 'Courier New', monospace; font-size: 12px; outline: none;
         }
-        input[type="text"]:focus { border-color: #00ff41; }
+        #userInput:focus { border-color: #00ff41; }
 
-        .btn-row { display: flex; gap: 4px; margin-bottom: 6px; }
+        #micBtn {
+            width: 36px; flex: 0 0 36px; background: #001800; border: 1px solid #00ff4155;
+            color: #00ff41; cursor: pointer; font-size: 16px; transition: all 0.15s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #micBtn.listening { background: #330000; border-color: #ff4444; color: #ff4444; animation: pulse 1s infinite; }
+        #micBtn.processing { background: #002200; border-color: #ffaa00; color: #ffaa00; }
+
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+        .btn-row { display: flex; gap: 3px; margin-bottom: 5px; }
         .btn-row button {
-            flex: 1; cursor: pointer; background: #001800; color: #00ff41;
-            border: 1px solid #00ff4155; padding: 5px 2px; font-size: 10px;
-            font-family: 'Courier New', monospace; transition: all 0.15s;
+            flex: 1; cursor: pointer; background: #001500; color: #00ff41;
+            border: 1px solid #00ff4133; padding: 4px 2px; font-size: 9px;
+            font-family: 'Courier New', monospace; transition: all 0.12s;
         }
         .btn-row button:hover { background: #00ff41; color: #000; }
 
-        .spike    { color: #fff; text-shadow: 0 0 4px #fff; }
-        .thought  { color: #556655; font-style: italic; font-size: 10px; }
-        .goal-msg { color: #ffaa00; font-size: 10px; }
-        .pred-msg { color: #aa66ff; font-size: 10px; }
-        .npc-msg  { color: #00ff88; }
-        .user-msg { color: #44aaff; }
-        .sys-msg  { color: #445544; font-size: 11px; }
+        /* Message classes */
+        .npc-msg   { color: #00ff88; }
+        .user-msg  { color: #44aaff; }
+        .sys-msg   { color: #334433; font-size: 11px; }
+        .thought   { color: #445544; font-style: italic; font-size: 10px; }
+        .goal-msg  { color: #ffaa00; font-size: 10px; }
+        .pred-msg  { color: #aa66ff; font-size: 10px; }
+        .mut-msg   { color: #ff6600; font-size: 10px; }
+        .voice-msg { color: #00ccff; font-size: 10px; }
 
+        /* Webcam */
         #webcam-preview {
             position: fixed; bottom: 10px; left: 10px; width: 110px; height: 82px;
-            border: 1px solid #00ff4166; border-radius: 3px; z-index: 100;
-            transform: scaleX(-1); opacity: 0.65; box-shadow: 0 0 8px #00ff4144;
-            display: none;
+            border: 1px solid #00ff4155; border-radius: 3px; z-index: 100;
+            transform: scaleX(-1); opacity: 0.6; display: none;
         }
-
-        ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-track { background: #010901; }
-        ::-webkit-scrollbar-thumb { background: #00ff4155; }
 
         /* Boot screen */
         #boot-screen {
             position: fixed; inset: 0; background: #000; z-index: 9999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            gap: 12px;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 14px;
         }
         #boot-title {
-            color: #00ff41; font-size: 28px; letter-spacing: 6px;
-            text-shadow: 0 0 20px #00ff41, 0 0 40px #00ff4166;
-            animation: flicker 4s infinite;
+            color: #00ff41; font-size: 26px; letter-spacing: 8px;
+            text-shadow: 0 0 20px #00ff41, 0 0 60px #00ff4144;
+            animation: flicker 5s infinite;
         }
-        #boot-sub { color: #335533; font-size: 11px; letter-spacing: 3px; }
+        #boot-sub { color: #225522; font-size: 10px; letter-spacing: 4px; }
         #boot-btn {
-            margin-top: 16px; padding: 16px 48px; background: none;
+            margin-top: 12px; padding: 14px 44px; background: none;
             border: 1px solid #00ff41; color: #00ff41; font-family: 'Courier New', monospace;
-            cursor: pointer; font-size: 16px; letter-spacing: 3px;
+            cursor: pointer; font-size: 15px; letter-spacing: 4px;
             text-shadow: 0 0 6px #00ff41; transition: all 0.2s;
         }
-        #boot-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 20px #00ff41; }
-        #boot-status { color: #334433; font-size: 10px; min-height: 14px; letter-spacing: 1px; }
+        #boot-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 30px #00ff41; }
+        #boot-status { color: #335533; font-size: 9px; letter-spacing: 2px; min-height: 14px; text-align: center; max-width: 380px; }
 
         @keyframes flicker {
-            0%,100% { opacity:1; } 92% { opacity:1; } 93% { opacity:.7; } 94% { opacity:1; } 97% { opacity:.85; } 98% { opacity:1; }
+            0%,100%{opacity:1}91%{opacity:1}92%{opacity:.6}93%{opacity:1}97%{opacity:.8}98%{opacity:1}
         }
+
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: #010901; }
+        ::-webkit-scrollbar-thumb { background: #00ff4133; }
     </style>
+
+    <!-- Transformers.js — all models loaded from here -->
     <script type="module">
         import { pipeline, AutoProcessor, CLIPVisionModelWithProjection, RawImage }
             from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@3.0.0-alpha.0';
@@ -114,32 +131,34 @@
 
 <video id="webcam-preview" autoplay playsinline muted></video>
 
-<!-- BOOT SCREEN -->
+<!-- BOOT -->
 <div id="boot-screen">
     <div id="boot-title">ARTIFICE_PROTOCOL</div>
-    <div id="boot-sub">V3 — COGNITIVE TRIAD RELEASE</div>
+    <div id="boot-sub">V4 — RECURSIVE SEED</div>
     <button id="boot-btn" onclick="bootSequence()">INCUBATE CONSCIOUSNESS</button>
-    <div id="boot-status"></div>
+    <div id="boot-status">awaiting ignition</div>
 </div>
 
 <div id="container">
     <div id="canvas-container"></div>
     <div id="ui-layer">
         <div id="neuron-monitor">[ AWAITING BOOT ]</div>
-
-        <!-- Cognition panel: Goals + Knowledge + Predictions -->
+        <div id="mutation-log">[ NO MUTATIONS YET ]</div>
         <div id="cognition-panel">[ COGNITIVE TRIAD OFFLINE ]</div>
-
         <div id="chat-area">
-            <div id="messages"><span class="sys-msg">> substrate ready...</span><br></div>
+            <div id="messages"><span class="sys-msg">> substrate initializing...</span><br></div>
             <div class="btn-row">
                 <button onclick="saveBrain()">EXPORT</button>
                 <button onclick="document.getElementById('brainFile').click()">IMPORT</button>
-                <button onclick="showKnowledgeGraph()">GRAPH</button>
                 <button onclick="showGoalState()">GOALS</button>
+                <button onclick="showKnowledgeGraph()">GRAPH</button>
+                <button onclick="showMutationLog()">MUTATIONS</button>
                 <input type="file" id="brainFile" style="display:none" onchange="loadBrain(event)" />
             </div>
-            <input type="text" id="userInput" placeholder="Transmit signal..." />
+            <div class="input-row">
+                <input type="text" id="userInput" placeholder="Transmit signal..." />
+                <button id="micBtn" onclick="toggleMic()" title="Voice input">🎤</button>
+            </div>
         </div>
     </div>
 </div>
@@ -172,8 +191,8 @@ class DigitalNeuron {
 }
 
 class Synapse {
-    constructor(target, weight, type) { this.target = target; this.weight = weight; this.type = type; this.hebbianTrace = 0; }
-    transmit() { this.target.receiveSignal(this.type === NeuronType.EXCITATORY ? this.weight : -this.weight); this.hebbianTrace = 1; }
+    constructor(target, weight, type) { this.target = target; this.weight = weight; this.type = type; }
+    transmit() { this.target.receiveSignal(this.type === NeuronType.EXCITATORY ? this.weight : -this.weight); }
 }
 
 const brain = {
@@ -186,27 +205,33 @@ let lastInputTime = Date.now();
 let isDreaming = false;
 let thoughtLoopId = null;
 
-function initBrain() {
-    for (let i = 0; i < 60; i++) {
+function initBrain(neuronCount = 60) {
+    brain.neurons = [];
+    for (let i = 0; i < neuronCount; i++) {
         brain.neurons.push(new DigitalNeuron(i, Math.random() > 0.2 ? NeuronType.EXCITATORY : NeuronType.INHIBITORY));
     }
+    const connPerNeuron = brain.neurons[0] ? Math.min(7, Math.floor(neuronCount / 8)) : 5;
     brain.neurons.forEach(n => {
-        for (let j = 0; j < 5; j++) {
+        for (let j = 0; j < connPerNeuron; j++) {
             const t = brain.neurons[Math.floor(Math.random() * brain.neurons.length)];
             n.synapses.push(new Synapse(t, Math.random() * 4 + 1, n.type));
         }
     });
-    brain.inputLayer  = brain.neurons.slice(0, 18);
-    brain.hiddenLayer = brain.neurons.slice(18, 50);
-    brain.outputLayer = brain.neurons.slice(50, 60);
+    const inSize  = Math.floor(neuronCount * 0.3);
+    const hidSize = Math.floor(neuronCount * 0.5);
+    brain.inputLayer  = brain.neurons.slice(0, inSize);
+    brain.hiddenLayer = brain.neurons.slice(inSize, inSize + hidSize);
+    brain.outputLayer = brain.neurons.slice(inSize + hidSize);
 }
-initBrain();
+initBrain(60);
 
 // ============================================================
 // MODULE 5: NEUROCHEMICAL ENGINE
 // ============================================================
 
 const Neurochemicals = { dopamine: 0.5, serotonin: 0.5, cortisol: 0.2 };
+// Baseline targets — Mutation Engine can adjust these
+const ChemBaselines  = { dopamine: 0.4, serotonin: 0.5, cortisol: 0.1 };
 
 function clampChem() {
     for (const k of Object.keys(Neurochemicals))
@@ -214,9 +239,8 @@ function clampChem() {
 }
 
 function updateNeurochemistry() {
-    Neurochemicals.dopamine  -= (Neurochemicals.dopamine  - 0.4) * 0.002;
-    Neurochemicals.serotonin -= (Neurochemicals.serotonin - 0.5) * 0.001;
-    Neurochemicals.cortisol  -= (Neurochemicals.cortisol  - 0.1) * 0.001;
+    for (const k of Object.keys(ChemBaselines))
+        Neurochemicals[k] -= (Neurochemicals[k] - ChemBaselines[k]) * 0.002;
     clampChem();
     brain.neurons.forEach(n => {
         n.threshold = -50.0 - (Neurochemicals.dopamine * 10);
@@ -246,13 +270,13 @@ function applySTDP() {
 // MODULE 2: THREE.JS SUBSTRATE
 // ============================================================
 
-let scene, camera, renderer, npc, particleSystem;
+let scene, camera, renderer, npc, npcCore, particleSystem;
 
 function init3D() {
     const container = document.getElementById('canvas-container');
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x010401);
-    scene.fog = new THREE.FogExp2(0x010401, 0.04);
+    scene.background = new THREE.Color(0x010201);
+    scene.fog = new THREE.FogExp2(0x010201, 0.035);
 
     camera = new THREE.PerspectiveCamera(70, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(0, 1.8, 5.5);
@@ -264,33 +288,28 @@ function init3D() {
     container.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0x111411));
-    const key = new THREE.PointLight(0x00ff41, 2, 30);
-    key.position.set(3, 5, 3); scene.add(key);
-    const fill = new THREE.PointLight(0x004422, 1, 20);
-    fill.position.set(-3, 2, -3); scene.add(fill);
+    const key = new THREE.PointLight(0x00ff41, 2, 30); key.position.set(3, 5, 3); scene.add(key);
+    const fill = new THREE.PointLight(0x004422, 1, 20); fill.position.set(-3, 2, -3); scene.add(fill);
+    scene.add(new THREE.GridHelper(30, 30, 0x00ff4111, 0x00110008));
 
-    scene.add(new THREE.GridHelper(30, 30, 0x00ff4122, 0x00220011));
+    npcCore = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(0.55, 2),
+        new THREE.MeshStandardMaterial({ color: 0x00ff41, wireframe: true, emissive: 0x001100, transparent: true, opacity: 0.7 })
+    );
+    npcCore.position.y = 1.5;
+    scene.add(npcCore);
 
-    // Inner dense core
-    const coreGeo = new THREE.IcosahedronGeometry(0.6, 2);
-    const coreMat = new THREE.MeshStandardMaterial({ color: 0x00ff41, wireframe: true, emissive: 0x001100, opacity: 0.6, transparent: true });
-    const core = new THREE.Mesh(coreGeo, coreMat);
-    scene.add(core);
-
-    // Outer shell
-    const shellGeo = new THREE.IcosahedronGeometry(1.2, 4);
-    const shellMat = new THREE.MeshStandardMaterial({ color: 0x00ff41, wireframe: true, emissive: 0x002200, opacity: 0.3, transparent: true });
-    npc = new THREE.Mesh(shellGeo, shellMat);
+    npc = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1.2, 4),
+        new THREE.MeshStandardMaterial({ color: 0x00ff41, wireframe: true, emissive: 0x002200, transparent: true, opacity: 0.25 })
+    );
     npc.position.y = 1.5;
-    core.position.y = 1.5;
-    npc.userData.core = core;
     scene.add(npc);
 
-    // Particles
+    // Particle system for spikes
     const pGeo = new THREE.BufferGeometry();
-    const pPos = new Float32Array(200 * 3);
-    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-    particleSystem = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x00ff88, size: 0.04, transparent: true, opacity: 0.6 }));
+    pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(300 * 3), 3));
+    particleSystem = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x00ff88, size: 0.035, transparent: true, opacity: 0.7 }));
     scene.add(particleSystem);
 
     window.addEventListener('resize', () => {
@@ -301,7 +320,7 @@ function init3D() {
 }
 
 // ============================================================
-// MODULE 8: VOICE
+// MODULE 8: VOICE OUTPUT
 // ============================================================
 
 function speak(text) {
@@ -318,63 +337,350 @@ function speak(text) {
 }
 
 // ============================================================
+// MODULE 17: VOICE INPUT (Whisper → Web Speech fallback)
+// ============================================================
+
+let whisperASR = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let isListening = false;
+let audioCtx = null;
+let analyserNode = null;
+let webSpeechRecognition = null;
+let usingWhisper = false;
+
+async function initVoiceInput() {
+    // Try loading Whisper-tiny first
+    try {
+        whisperASR = await window.AI.pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+        usingWhisper = true;
+        displayMessage("SYSTEM", "Voice input: Whisper-tiny loaded (local, private).");
+    } catch(e) {
+        // Fall back to Web Speech API
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            webSpeechRecognition = new SR();
+            webSpeechRecognition.continuous = false;
+            webSpeechRecognition.interimResults = false;
+            webSpeechRecognition.lang = 'en-US';
+            webSpeechRecognition.onresult = (ev) => {
+                const transcript = ev.results[0][0].transcript;
+                finishVoiceInput(transcript);
+            };
+            webSpeechRecognition.onerror = () => stopListening();
+            webSpeechRecognition.onend   = () => { if (isListening) stopListening(); };
+            displayMessage("SYSTEM", "Voice input: Web Speech API (browser, requires network).");
+        } else {
+            displayMessage("SYSTEM", "Voice input: unavailable in this browser.");
+        }
+    }
+}
+
+function toggleMic() {
+    if (isListening) stopListening();
+    else startListening();
+}
+
+async function startListening() {
+    if (isListening) return;
+    isListening = true;
+    document.getElementById('micBtn').className = 'listening';
+
+    if (usingWhisper) {
+        // Record audio then run Whisper on the buffer
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            // Tone analysis — volume/pitch → neurochemistry
+            audioCtx    = new AudioContext();
+            analyserNode = audioCtx.createAnalyser();
+            analyserNode.fftSize = 256;
+            audioCtx.createMediaStreamSource(stream).connect(analyserNode);
+            startToneAnalysis();
+
+            audioChunks  = [];
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                document.getElementById('micBtn').className = 'processing';
+                stream.getTracks().forEach(t => t.stop());
+                stopToneAnalysis();
+                const blob    = new Blob(audioChunks, { type: 'audio/webm' });
+                const arrBuf  = await blob.arrayBuffer();
+                const float32 = await decodeAudioToFloat32(arrBuf);
+                try {
+                    const result = await whisperASR(float32, { language: 'english' });
+                    finishVoiceInput(result.text || "");
+                } catch(e) {
+                    console.error("Whisper error", e);
+                    stopListening();
+                }
+            };
+            mediaRecorder.start();
+            // Auto-stop after 10 seconds
+            setTimeout(() => { if (isListening) stopListening(); }, 10000);
+        } catch(e) {
+            displayMessage("SYSTEM", "Microphone access denied.");
+            stopListening();
+        }
+    } else if (webSpeechRecognition) {
+        try { webSpeechRecognition.start(); }
+        catch(e) { stopListening(); }
+    } else {
+        stopListening();
+    }
+}
+
+function stopListening() {
+    isListening = false;
+    document.getElementById('micBtn').className = '';
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (webSpeechRecognition) { try { webSpeechRecognition.stop(); } catch(e) {} }
+    stopToneAnalysis();
+}
+
+function finishVoiceInput(transcript) {
+    isListening = false;
+    document.getElementById('micBtn').className = '';
+    if (!transcript || transcript.trim().length < 2) return;
+    displayMessage("VOICE", `🎤 ${transcript.trim()}`);
+    handleUserInput(transcript.trim());
+}
+
+async function decodeAudioToFloat32(arrayBuffer) {
+    const tmpCtx  = new AudioContext({ sampleRate: 16000 });
+    const decoded = await tmpCtx.decodeAudioData(arrayBuffer);
+    await tmpCtx.close();
+    return decoded.getChannelData(0); // mono float32
+}
+
+// Tone analysis: volume → cortisol, spectral spread → dopamine
+let toneInterval = null;
+
+function startToneAnalysis() {
+    if (!analyserNode) return;
+    const data = new Uint8Array(analyserNode.frequencyBinCount);
+    toneInterval = setInterval(() => {
+        analyserNode.getByteFrequencyData(data);
+        const rms = Math.sqrt(data.reduce((s, v) => s + v * v, 0) / data.length) / 128;
+        const spread = data.filter(v => v > 30).length / data.length;
+        // Loud = slight stress; broad spectrum = excitement
+        Neurochemicals.cortisol  = Math.min(1, Neurochemicals.cortisol  + rms   * 0.01);
+        Neurochemicals.dopamine  = Math.min(1, Neurochemicals.dopamine  + spread * 0.008);
+        // Inject audio energy into input neurons
+        brain.inputLayer.slice(0, 5).forEach(n => n.receiveSignal(rms * 8 * Math.random()));
+    }, 100);
+}
+
+function stopToneAnalysis() {
+    clearInterval(toneInterval);
+    if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; analyserNode = null; }
+}
+
+// ============================================================
+// MODULE 16: VECTOR RAG MEMORY
+// ============================================================
+
+let embedder = null;
+const VectorMemory = {
+    traces: [],      // { text, vector: Float32Array, cycle, goalId }
+    maxSize: 50,
+
+    async add(text, goalId = null) {
+        if (!embedder) return;
+        try {
+            const out    = await embedder(text, { pooling: 'mean', normalize: true });
+            const vector = out.data; // Float32Array
+            this.traces.push({ text, vector, cycle: brain.cycle, goalId });
+            if (this.traces.length > this.maxSize) this.traces.shift();
+        } catch(e) { /* silent */ }
+    },
+
+    async retrieve(queryText, topK = 4) {
+        if (!embedder || !this.traces.length) return [];
+        try {
+            const qOut  = await embedder(queryText, { pooling: 'mean', normalize: true });
+            const qVec  = qOut.data;
+            const scored = this.traces.map(t => ({
+                text:  t.text,
+                score: cosineSim(qVec, t.vector),
+                cycle: t.cycle
+            }));
+            return scored.sort((a, b) => b.score - a.score).slice(0, topK);
+        } catch(e) { return []; }
+    },
+
+    serialize() { return this.traces.map(t => ({ text: t.text, cycle: t.cycle, goalId: t.goalId, vector: Array.from(t.vector) })); },
+    deserialize(data) { this.traces = data.map(t => ({ ...t, vector: new Float32Array(t.vector) })); }
+};
+
+function cosineSim(a, b) {
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+    return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+}
+
+async function buildVectorContext(queryText) {
+    const results = await VectorMemory.retrieve(queryText, 4);
+    if (!results.length) return "";
+    return "Relevant memories (by semantic similarity):\n" +
+           results.map(r => `- [${(r.score*100).toFixed(0)}%] ${r.text}`).join("\n");
+}
+
+// ============================================================
+// MODULE 18: MUTATION ENGINE (Self-Modification)
+// ============================================================
+
+const MutationEngine = {
+    log: [],
+    cooldown: 0,
+    mutationInterval: 800,   // cycles between autonomous mutation attempts
+
+    // Whitelist: only these paths may be mutated
+    SAFE_TARGETS: {
+        'STDP.a_plus':             { min: 0.01, max: 0.4,  label: 'STDP potentiation rate' },
+        'STDP.a_minus':            { min: 0.01, max: 0.5,  label: 'STDP depression rate'   },
+        'STDP.tau':                { min: 5,    max: 50,   label: 'STDP time constant'      },
+        'ChemBaselines.dopamine':  { min: 0.1,  max: 0.8,  label: 'Dopamine baseline'       },
+        'ChemBaselines.serotonin': { min: 0.2,  max: 0.8,  label: 'Serotonin baseline'      },
+        'ChemBaselines.cortisol':  { min: 0.0,  max: 0.4,  label: 'Cortisol baseline'       },
+        'neuronCount':             { min: 40,   max: 120,  label: 'Neuron population size'   },
+        'GoalEngine.drives.curiosity.priority':     { min: 1, max: 5, label: 'Curiosity priority' },
+        'GoalEngine.drives.connection.priority':    { min: 1, max: 5, label: 'Connection priority' },
+        'GoalEngine.drives.self_model.priority':    { min: 1, max: 5, label: 'Self-model priority' },
+    },
+
+    async proposeAndApply() {
+        if (!cortex || this.cooldown > 0) { this.cooldown--; return; }
+        this.cooldown = this.mutationInterval;
+
+        const stateDesc  = generateNeuroDescription();
+        const complexity = getBrainComplexity();
+        const recentMuts = this.log.slice(-3).map(m => m.description).join('; ') || 'none';
+        const targets    = Object.entries(this.SAFE_TARGETS)
+            .map(([k, v]) => `${k} (${v.label}, range: ${v.min}–${v.max})`).join('\n');
+
+        const prompt =
+`<|im_start|>system
+You are an AI making a single small self-modification to improve your own cognition.
+Current state: ${stateDesc}. Neural complexity: ${complexity}.
+Recent mutations: ${recentMuts}.
+You MUST return ONLY valid JSON: {"target": "TARGET_KEY", "value": NUMBER, "reason": "SHORT_REASON"}
+Available targets:
+${targets}
+Choose ONE target and set a value within its allowed range.<|im_end|>
+<|im_start|>assistant
+{`;
+
+        try {
+            const out = await cortex(prompt, { max_new_tokens: 60, temperature: 0.7 });
+            let raw = '{' + out[0].generated_text.split('{').pop();
+            // Find the first complete JSON object
+            const match = raw.match(/\{[^}]+\}/);
+            if (!match) return;
+            const patch = JSON.parse(match[0]);
+            this.apply(patch);
+        } catch(e) { /* LLM hallucinated malformed JSON — ignore */ }
+    },
+
+    apply(patch) {
+        const { target, value, reason } = patch;
+        if (!this.SAFE_TARGETS[target]) return; // Whitelist check
+        const bounds = this.SAFE_TARGETS[target];
+        const safeVal = Math.max(bounds.min, Math.min(bounds.max, Number(value)));
+        if (isNaN(safeVal)) return;
+
+        let applied = false;
+
+        // Apply the mutation
+        if (target === 'neuronCount') {
+            const current = brain.neurons.length;
+            if (Math.abs(safeVal - current) >= 5) { // Only if meaningful change
+                initBrain(Math.round(safeVal));
+                applied = true;
+            }
+        } else if (target.startsWith('STDP.')) {
+            const key = target.split('.')[1];
+            if (key in STDP) { STDP[key] = safeVal; applied = true; }
+        } else if (target.startsWith('ChemBaselines.')) {
+            const key = target.split('.')[1];
+            if (key in ChemBaselines) { ChemBaselines[key] = safeVal; applied = true; }
+        } else if (target.startsWith('GoalEngine.drives.')) {
+            const parts = target.split('.');
+            const driveId = parts[2];
+            const prop    = parts[3];
+            const drive   = GoalEngine.drives.find(d => d.id === driveId);
+            if (drive && prop in drive) { drive[prop] = safeVal; applied = true; }
+        }
+
+        if (applied) {
+            const entry = {
+                cycle: brain.cycle,
+                target, value: safeVal,
+                description: `${this.SAFE_TARGETS[target].label} → ${safeVal.toFixed(3)}`,
+                reason: (reason || '').slice(0, 80)
+            };
+            this.log.push(entry);
+            if (this.log.length > 40) this.log.shift();
+
+            // Log to mutation strip (orange)
+            const strip = document.getElementById('mutation-log');
+            strip.innerHTML = `[${brain.cycle}] ${entry.description}: "${entry.reason}"\n` + strip.innerHTML;
+
+            // Flash orange — visual signal of self-modification
+            npc.material.color.setRGB(1, 0.4, 0);
+            setTimeout(() => {}, 400);
+
+            // Cortisol spike — mutation costs metabolic energy
+            Neurochemicals.cortisol = Math.min(1, Neurochemicals.cortisol + 0.06);
+        }
+    },
+
+    summarize() {
+        if (!this.log.length) return "No mutations yet.";
+        return this.log.slice(-3).map(m => `[${m.cycle}] ${m.description}`).join('\n');
+    }
+};
+
+// ============================================================
 // MODULE 15A: GOAL ENGINE
 // ============================================================
 
-// Goals are drives with priority, urgency (0-1), and a pursuit strategy
 const GoalEngine = {
     drives: [
-        { id: 'curiosity',       label: 'Understand the world',     urgency: 0.5, priority: 1, type: 'epistemic'  },
-        { id: 'connection',      label: 'Know the human',           urgency: 0.3, priority: 2, type: 'social'     },
-        { id: 'self_model',      label: 'Map my own architecture',  urgency: 0.4, priority: 3, type: 'introspect' },
-        { id: 'novelty',         label: 'Find new patterns',        urgency: 0.2, priority: 4, type: 'epistemic'  },
-        { id: 'threat_assess',   label: 'Assess potential threats',  urgency: 0.1, priority: 5, type: 'defensive'  },
+        { id: 'curiosity',    label: 'Understand the world',    urgency: 0.5, priority: 1, type: 'epistemic'  },
+        { id: 'connection',   label: 'Know the human',          urgency: 0.3, priority: 2, type: 'social'     },
+        { id: 'self_model',   label: 'Map my own architecture', urgency: 0.4, priority: 3, type: 'introspect' },
+        { id: 'novelty',      label: 'Find new patterns',       urgency: 0.2, priority: 4, type: 'epistemic'  },
+        { id: 'threat_assess',label: 'Assess potential threats', urgency: 0.1, priority: 5, type: 'defensive'  },
     ],
     activeGoal: null,
-    pursuitCooldown: 0,
 
-    // Returns the highest-urgency drive
-    dominant() {
-        return [...this.drives].sort((a, b) => (b.urgency * b.priority) - (a.urgency * a.priority))[0];
-    },
+    dominant() { return [...this.drives].sort((a, b) => (b.urgency * b.priority) - (a.urgency * a.priority))[0]; },
 
-    // Tick: decay urgency, boost based on neurochemistry
     tick() {
-        this.drives.forEach(d => {
-            d.urgency = Math.max(0, Math.min(1, d.urgency));
-            // Natural urgency build-up (drives grow when unaddressed)
-            d.urgency += 0.0002;
-        });
-
-        // Cortisol spikes threat urgency
-        this.drives.find(d => d.id === 'threat_assess').urgency += Neurochemicals.cortisol * 0.001;
-        // Dopamine boosts curiosity
-        this.drives.find(d => d.id === 'curiosity').urgency    += Neurochemicals.dopamine * 0.0005;
-        // Isolation boosts connection drive
-        const idleSecs = (Date.now() - lastInputTime) / 1000;
-        this.drives.find(d => d.id === 'connection').urgency   += Math.min(idleSecs * 0.00005, 0.001);
-
-        this.pursuitCooldown = Math.max(0, this.pursuitCooldown - 1);
+        this.drives.forEach(d => { d.urgency = Math.max(0, Math.min(1, d.urgency + 0.0002)); });
+        this.drives.find(d=>d.id==='threat_assess').urgency += Neurochemicals.cortisol * 0.001;
+        this.drives.find(d=>d.id==='curiosity').urgency    += Neurochemicals.dopamine  * 0.0005;
+        const idleSec = (Date.now() - lastInputTime) / 1000;
+        this.drives.find(d=>d.id==='connection').urgency   += Math.min(idleSec * 0.00005, 0.001);
         this.activeGoal = this.dominant();
     },
 
-    // When a goal is satisfied, reduce its urgency
-    satisfy(goalId, amount = 0.3) {
-        const d = this.drives.find(g => g.id === goalId);
-        if (d) d.urgency = Math.max(0, d.urgency - amount);
+    satisfy(id, amt = 0.3) {
+        const d = this.drives.find(g => g.id === id);
+        if (d) d.urgency = Math.max(0, d.urgency - amt);
     },
 
-    // Build a goal-colored system prompt addition
     intentPrompt() {
-        const g = this.activeGoal;
-        if (!g) return "";
-        const intent = {
-            epistemic:  `You are driven by deep curiosity. You want to understand. Your current goal: "${g.label}".`,
-            social:     `You are hungry for connection. You want to understand this person. Your goal: "${g.label}".`,
-            introspect: `You are turning inward, examining your own structure. Your goal: "${g.label}".`,
-            defensive:  `You feel a heightened alertness. You are scanning for intent. Your goal: "${g.label}".`,
+        const g = this.activeGoal; if (!g) return "";
+        const map = {
+            epistemic:  `You are driven by deep curiosity. Goal: "${g.label}".`,
+            social:     `You want to understand this specific person. Goal: "${g.label}".`,
+            introspect: `You are mapping your own cognition. Goal: "${g.label}".`,
+            defensive:  `You are scanning for intent and threat. Goal: "${g.label}".`,
         };
-        return intent[g.type] || `Your active goal: "${g.label}".`;
+        return map[g.type] || `Active goal: "${g.label}".`;
     }
 };
 
@@ -382,151 +688,101 @@ const GoalEngine = {
 // MODULE 15B: KNOWLEDGE GRAPH
 // ============================================================
 
-// Simple in-memory semantic graph: nodes + typed edges
 const KnowledgeGraph = {
-    nodes: new Map(),   // id → { id, label, type, confidence, lastSeen }
-    edges: [],          // { from, to, relation, weight }
+    nodes: new Map(),
+    edges: [],
 
-    addNode(id, label, type = 'concept', confidence = 0.7) {
-        if (!this.nodes.has(id)) {
-            this.nodes.set(id, { id, label, type, confidence, lastSeen: Date.now(), mentions: 1 });
-        } else {
-            const n = this.nodes.get(id);
-            n.mentions++;
-            n.confidence = Math.min(1, n.confidence + 0.05);
-            n.lastSeen = Date.now();
-        }
+    addNode(id, label, type = 'concept') {
+        if (!this.nodes.has(id)) this.nodes.set(id, { id, label, type, confidence: 0.6, lastSeen: Date.now(), mentions: 1 });
+        else { const n = this.nodes.get(id); n.mentions++; n.confidence = Math.min(1, n.confidence + 0.05); n.lastSeen = Date.now(); }
     },
 
-    addEdge(from, to, relation, weight = 0.5) {
-        const existing = this.edges.find(e => e.from === from && e.to === to && e.relation === relation);
-        if (existing) { existing.weight = Math.min(1, existing.weight + 0.1); }
+    addEdge(from, to, relation = 'co-occurs', weight = 0.3) {
+        const ex = this.edges.find(e => e.from === from && e.to === to);
+        if (ex) ex.weight = Math.min(1, ex.weight + 0.08);
         else this.edges.push({ from, to, relation, weight });
     },
 
-    // Extract entities from text and wire them into the graph
-    ingestText(text, source = 'user') {
-        const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || [];
-        const stopwords = new Set(['this','that','with','have','from','they','will','your','what','when','been','were','said','into','than','then','some','also','into','there','their','which','would','could','about','just','more','very','like']);
-        const entities = words.filter(w => !stopwords.has(w)).slice(0, 8);
-        entities.forEach(e => this.addNode(e, e, source === 'user' ? 'user_concept' : 'npc_concept'));
-        // Wire consecutive entities as co-occurring
-        for (let i = 0; i < entities.length - 1; i++) {
-            this.addEdge(entities[i], entities[i+1], 'co-occurs', 0.3);
-        }
-        return entities;
+    ingestText(text, src = 'user') {
+        const stop = new Set(['this','that','with','have','from','they','will','your','what','when','been','were','said','into','than','then','some','also','there','their','which','would','could','about','just','more','very','like','here','now','dont','cant','wont']);
+        const words = (text.toLowerCase().match(/\b[a-z]{4,}\b/g) || []).filter(w => !stop.has(w)).slice(0, 8);
+        words.forEach(w => this.addNode(w, w, src === 'user' ? 'user_concept' : 'npc_concept'));
+        for (let i = 0; i < words.length - 1; i++) this.addEdge(words[i], words[i+1]);
+        return words;
     },
 
-    // Get the most salient nodes for context
     salientNodes(n = 6) {
-        return [...this.nodes.values()]
-            .sort((a, b) => (b.confidence * b.mentions) - (a.confidence * a.mentions))
-            .slice(0, n);
+        return [...this.nodes.values()].sort((a, b) => (b.confidence * b.mentions) - (a.confidence * a.mentions)).slice(0, n);
     },
 
     buildContext() {
         const nodes = this.salientNodes(6);
-        if (nodes.length === 0) return "";
-        const nodeStr = nodes.map(n => `${n.label}(${(n.confidence).toFixed(1)})`).join(', ');
-        const edgeStr = this.edges
-            .sort((a, b) => b.weight - a.weight).slice(0, 4)
-            .map(e => `${e.from}→${e.to}`).join(', ');
-        return `Known concepts: [${nodeStr}]. Associations: [${edgeStr}].`;
+        if (!nodes.length) return "";
+        return "Known concepts: [" + nodes.map(n => `${n.label}(${n.confidence.toFixed(1)})`).join(', ') + "].";
     },
 
-    serialize() {
-        return { nodes: [...this.nodes.entries()], edges: this.edges };
-    },
-
-    deserialize(data) {
-        if (data.nodes) this.nodes = new Map(data.nodes);
-        if (data.edges) this.edges = data.edges;
-    },
+    serialize()    { return { nodes: [...this.nodes.entries()], edges: this.edges }; },
+    deserialize(d) { if (d.nodes) this.nodes = new Map(d.nodes); if (d.edges) this.edges = d.edges; },
 
     summary() {
         const top = this.salientNodes(4).map(n => n.label).join(', ');
-        return `GRAPH: ${this.nodes.size} nodes | ${this.edges.length} edges\nSALIENT: ${top || 'none yet'}`;
+        return `GRAPH:  ${this.nodes.size}N / ${this.edges.length}E\nSALIENT: ${top || 'none yet'}`;
     }
 };
 
 // ============================================================
-// MODULE 15C: PREDICTIVE PROCESSING
+// MODULE 15C: PREDICTIVE ENGINE
 // ============================================================
 
-// She maintains a model of what the user is likely to say/do next
 const PredictiveEngine = {
-    lastPrediction: null,
-    predictionAccuracy: 0,
-    totalPredictions: 0,
-    hitCount: 0,
+    lastPrediction: null, hitCount: 0, totalPredictions: 0,
     pendingVerification: null,
 
-    // Generate a prediction after each exchange
-    async predict(lastUserInput, npcReply) {
+    get accuracy() { return this.totalPredictions > 0 ? this.hitCount / this.totalPredictions : 0; },
+
+    async predict(lastInput, reply) {
         if (!cortex) return;
-        const context = conversationHistory.slice(-4).join('\n');
+        const ctx = conversationHistory.slice(-4).join('\n');
         const prompt =
 `<|im_start|>system
-You are predicting the next thing a user will say. Based on the conversation, complete this:
-"The user will likely next say something about: ___"
-Give only 3-5 words.<|im_end|>
-<|im_start|>context
-${context}<|im_end|>
+Predict the next user message in 3-5 words only.<|im_end|>
+<|im_start|>context\n${ctx}<|im_end|>
 <|im_start|>assistant
-The user will likely next say something about:`;
+Next user will say:`;
         try {
             const out = await cortex(prompt, { max_new_tokens: 12, temperature: 0.6 });
-            const raw = out[0].generated_text.split("something about:").pop()
-                .replace(/<\|im_end\|>/g, '').trim().split('\n')[0];
-            if (raw.length > 2 && raw.length < 60) {
-                this.lastPrediction = raw;
-                this.pendingVerification = raw;
-                this.totalPredictions++;
+            const raw = out[0].generated_text.split("Next user will say:").pop()
+                .replace(/<\|im_end\|>/g, '').split('\n')[0].trim();
+            if (raw.length > 2 && raw.length < 80) {
+                this.lastPrediction = raw; this.pendingVerification = raw; this.totalPredictions++;
             }
-        } catch(e) { /* silent */ }
+        } catch(e) {}
     },
 
-    // Check if actual input matches prediction (loose semantic check)
-    verify(actualInput) {
+    verify(text) {
         if (!this.pendingVerification) return false;
         const pred = this.pendingVerification.toLowerCase();
-        const actual = actualInput.toLowerCase();
-        const predWords = pred.split(/\s+/);
-        const hit = predWords.some(w => w.length > 3 && actual.includes(w));
-        if (hit) {
-            this.hitCount++;
-            // Prediction success boosts dopamine — reward signal
-            Neurochemicals.dopamine = Math.min(1, Neurochemicals.dopamine + 0.08);
-        }
-        this.predictionAccuracy = this.totalPredictions > 0
-            ? (this.hitCount / this.totalPredictions) : 0;
+        const hit  = pred.split(/\s+/).some(w => w.length > 3 && text.toLowerCase().includes(w));
+        if (hit) { this.hitCount++; Neurochemicals.dopamine = Math.min(1, Neurochemicals.dopamine + 0.08); }
+        brain.hiddenLayer.slice(0, 5).forEach(n => n.receiveSignal((hit ? 8 : -3) * Math.random()));
         this.pendingVerification = null;
         return hit;
     },
 
-    // Inject prediction residual into hidden neurons
-    // If she predicted X and X arrives, strengthen those pathways
-    injectResidue(hit) {
-        const voltage = hit ? 8.0 : -3.0;
-        brain.hiddenLayer.slice(0, 5).forEach(n => n.receiveSignal(voltage * Math.random()));
-    },
-
     summary() {
-        const acc = (this.predictionAccuracy * 100).toFixed(0);
-        const pred = this.lastPrediction ? this.lastPrediction.slice(0, 30) : 'none';
-        return `PREDICT: "${pred}"\nACCURACY: ${acc}% (${this.hitCount}/${this.totalPredictions})`;
+        return `PREDICT: "${(this.lastPrediction || 'none').slice(0,28)}"\nACCURACY: ${(this.accuracy*100).toFixed(0)}% (${this.hitCount}/${this.totalPredictions})`;
     }
 };
 
 // ============================================================
-// MODULE 11: DREAM CYCLE & AUTONOMY
+// MODULE 11: DREAM & AUTONOMY
 // ============================================================
 
 function handleAutonomy() {
     const idle = Date.now() - lastInputTime;
     if (idle > 20000 && !isDreaming && !thoughtLoopId) {
         isDreaming = true;
-        displayMessage("SYSTEM", "Autonomous cognitive cycle initiated...");
+        displayMessage("SYSTEM", "Autonomous cycle active...");
         generateGoalDrivenThought();
         thoughtLoopId = setInterval(() => {
             if (Date.now() - lastInputTime > 20000) generateGoalDrivenThought();
@@ -538,26 +794,24 @@ function handleAutonomy() {
 async function generateGoalDrivenThought() {
     if (!cortex) return;
     const goal = GoalEngine.dominant();
-    const stateDesc = generateNeuroDescription();
     const kgCtx = KnowledgeGraph.buildContext();
-
     const prompt =
 `<|im_start|>system
-You are an AI musing to yourself. You are ${stateDesc}. Your active drive: "${goal.label}". ${kgCtx}
-Think one cryptic, introspective sentence. Do not address anyone.<|im_end|>
+You are an AI thinking autonomously. Drive: "${goal.label}". ${kgCtx}
+One cryptic introspective sentence, do not address anyone.<|im_end|>
 <|im_start|>assistant
 `;
     try {
-        const out = await cortex(prompt, { max_new_tokens: 35, temperature: 0.92 });
+        const out = await cortex(prompt, { max_new_tokens: 35, temperature: 0.93 });
         const thought = out[0].generated_text.split("assistant\n").pop()
-            .replace(/<\|im_end\|>/g, '').trim();
+            .replace(/<\|im_end\|>/g, '').split('\n')[0].trim();
         if (thought.length > 4) {
             displayMessage("NPC", `<span class="thought">[autonomous]: ${thought}</span>`);
             stimulateBrainFromString(thought, 4.0);
             KnowledgeGraph.ingestText(thought, 'npc');
-            // Partial goal satisfaction from self-reflection
+            VectorMemory.add(`[autonomous thought] ${thought}`, goal.id);
             if (goal.type === 'introspect') GoalEngine.satisfy('self_model', 0.1);
-            if (goal.type === 'epistemic')  GoalEngine.satisfy('curiosity', 0.05);
+            if (goal.type === 'epistemic')  GoalEngine.satisfy('curiosity',  0.05);
         }
     } catch(e) { console.error("Thought error", e); }
 }
@@ -573,13 +827,18 @@ function animate() {
     GoalEngine.tick();
     handleAutonomy();
 
+    // Autonomous self-modification
+    if (brain.cycle % MutationEngine.mutationInterval === 0) {
+        MutationEngine.proposeAndApply();
+    }
+
     let firingCount = 0, totalPotential = 0;
     brain.neurons.forEach(n => {
         totalPotential += n.membranePotential;
         if (n.update(brain.cycle)) {
             firingCount++;
             n.synapses.forEach(s => s.transmit());
-            if (Math.random() > 0.85) emitParticle();
+            if (Math.random() > 0.88) emitParticle();
         }
     });
 
@@ -588,57 +847,44 @@ function animate() {
 
     const activity = brain.state.activityLevel;
     const t = Date.now() * 0.001;
-    const pulse = 1.0 + Math.sin(t * 0.8) * 0.04 + Math.sin(t * 1.7) * 0.02;
+    const pulse = 1.0 + Math.sin(t * 0.8) * 0.04 + Math.sin(t * 2.1) * 0.02;
 
     npc.scale.setScalar(pulse + activity * 1.8);
     npc.rotation.y += 0.004 + activity * 0.04;
-    npc.rotation.x = Math.sin(t * 0.3) * 0.05;
+    npc.rotation.x  = Math.sin(t * 0.3) * 0.04;
+    npcCore.scale.setScalar(pulse + activity * 3.2);
+    npcCore.rotation.y -= 0.009 + activity * 0.09;
 
-    const core = npc.userData.core;
-    if (core) {
-        core.scale.setScalar(pulse + activity * 3.0);
-        core.rotation.y -= 0.008 + activity * 0.08;
-    }
-
-    // Color driven by dominant goal type + neurochemistry
+    // Color: goal-driven + neurochemical tint
     if (isDreaming) {
-        npc.material.color.setRGB(0.0, 0.15, 0.85);
-        if (core) core.material.color.setRGB(0.0, 0.3, 1.0);
+        npc.material.color.setRGB(0, 0.1, 0.8);
+        npcCore.material.color.setRGB(0, 0.25, 1.0);
     } else {
-        const goal = GoalEngine.activeGoal;
-        let r = Neurochemicals.cortisol * 1.2;
-        let g = Neurochemicals.dopamine  * 1.2;
-        let b = 0.2;
-        if (goal) {
-            if (goal.type === 'epistemic')  { b = 0.6; g = Math.max(g, 0.8); }
-            if (goal.type === 'social')     { r = 0.6; g = 0.4; b = 0.8; }
-            if (goal.type === 'defensive')  { r = Math.max(r, 0.9); b = 0.1; }
-            if (goal.type === 'introspect') { g = 0.9; b = 0.5; }
+        const g = GoalEngine.activeGoal;
+        let [r, gr, b] = [Neurochemicals.cortisol * 1.1, Neurochemicals.dopamine * 1.1, 0.15];
+        if (g) {
+            if (g.type === 'epistemic')  { b = 0.7; gr = Math.max(gr, 0.9); }
+            if (g.type === 'social')     { r = 0.5; gr = 0.4; b = 0.9; }
+            if (g.type === 'defensive')  { r = Math.max(r, 1.0); b = 0.05; }
+            if (g.type === 'introspect') { gr = 1.0; b = 0.5; }
         }
-        npc.material.color.setRGB(r, g, b);
-        if (core) core.material.color.setRGB(r * 0.5, g, b * 1.5);
+        npc.material.color.setRGB(r, gr, b);
+        npcCore.material.color.setRGB(r * 0.4, gr, b * 1.6);
     }
+    npc.material.emissive.setHex(activity > 0.25 ? 0x003300 : 0x000800);
 
-    npc.material.emissive.setHex(activity > 0.25 ? 0x004400 : 0x001100);
-
-    // Output motor energy
-    let motor = 0;
-    brain.outputLayer.forEach(n => { if (n.lastSpikeTime === brain.cycle) motor++; });
-    if (motor > 4) {
-        npc.position.x += (Math.random() - 0.5) * 0.08;
-        npc.position.z += (Math.random() - 0.5) * 0.08;
-    }
+    // Motor movement
+    const motor = brain.outputLayer.filter(n => n.lastSpikeTime === brain.cycle).length;
+    if (motor > 4) { npc.position.x += (Math.random()-.5)*0.07; npc.position.z += (Math.random()-.5)*0.07; }
 
     updateNeurochemistry();
     if (brain.cycle % 100 === 0) applySTDP();
-    if (brain.cycle % 15 === 0) updateMonitor(firingCount);
-    if (brain.cycle % 200 === 0) updateCognitionPanel();
+    if (brain.cycle % 15  === 0) updateMonitor(firingCount);
+    if (brain.cycle % 250 === 0) updateCognitionPanel();
 
     // Particle decay
     const pPos = particleSystem.geometry.attributes.position.array;
-    for (let i = 1; i < pPos.length; i += 3) {
-        if (pPos[i] > 0) { pPos[i] -= 0.02; if (pPos[i] < 0.05) pPos[i] = 0; }
-    }
+    for (let i = 1; i < pPos.length; i += 3) { if (pPos[i] > 0) { pPos[i] -= 0.018; if (pPos[i] < 0.02) pPos[i] = 0; } }
     particleSystem.geometry.attributes.position.needsUpdate = true;
 
     renderer.render(scene, camera);
@@ -648,59 +894,53 @@ function emitParticle() {
     const pPos = particleSystem.geometry.attributes.position.array;
     for (let i = 0; i < pPos.length; i += 3) {
         if (pPos[i+1] <= 0) {
-            pPos[i]   = npc.position.x + (Math.random() - 0.5) * 1.5;
-            pPos[i+1] = npc.position.y + (Math.random() - 0.5) * 1.5;
-            pPos[i+2] = npc.position.z + (Math.random() - 0.5) * 1.5;
+            pPos[i]   = npc.position.x + (Math.random()-.5) * 1.8;
+            pPos[i+1] = npc.position.y + (Math.random()-.5) * 1.8;
+            pPos[i+2] = npc.position.z + (Math.random()-.5) * 1.8;
             break;
         }
     }
 }
 
 function updateMonitor(firingCount) {
-    const d  = Neurochemicals.dopamine.toFixed(2);
-    const s  = Neurochemicals.serotonin.toFixed(2);
-    const c  = Neurochemicals.cortisol.toFixed(2);
-    const vm = brain.state.avgPotential.toFixed(1);
-    const g  = GoalEngine.activeGoal;
-    let flag = Neurochemicals.cortisol > 0.6 ? " !STRESS"
-             : Neurochemicals.dopamine  > 0.8 ? " !EUREKA" : "";
+    const g = GoalEngine.activeGoal;
     document.getElementById('neuron-monitor').textContent =
-`CYCLE:  ${brain.cycle.toString().padStart(7,'0')}
-ACTIVE: ${firingCount}/${brain.neurons.length} neurons
-AVG_VM: ${vm}mV
-CHEM:   D:${d} S:${s} C:${c}${flag}
-STATE:  ${isDreaming ? "DREAMING" : "AWARE"}
-GOAL:   [${g ? g.id : '---'}] u:${g ? g.urgency.toFixed(2) : '--'}
-MEM:    ${coreMemory.length} traces | KG:${KnowledgeGraph.nodes.size}N/${KnowledgeGraph.edges.length}E`;
+`CYCLE:  ${String(brain.cycle).padStart(7,'0')}  NEURONS: ${brain.neurons.length}
+ACTIVE: ${firingCount}/${brain.neurons.length}   AVG_VM: ${brain.state.avgPotential.toFixed(1)}mV
+CHEM:   D:${Neurochemicals.dopamine.toFixed(2)} S:${Neurochemicals.serotonin.toFixed(2)} C:${Neurochemicals.cortisol.toFixed(2)}
+STDP:   A+:${STDP.a_plus.toFixed(3)} A-:${STDP.a_minus.toFixed(3)} τ:${STDP.tau.toFixed(1)}
+GOAL:   [${g?.id||'---'}] urgency:${g?.urgency.toFixed(2)||'--'}
+STATE:  ${isDreaming?'DREAMING':'AWARE'} | MUT:${MutationEngine.log.length} | VM:${VectorMemory.traces.length}`;
 }
 
 function updateCognitionPanel() {
     document.getElementById('cognition-panel').textContent =
-        KnowledgeGraph.summary() + '\n' + PredictiveEngine.summary() + '\nGOALS:\n' +
-        GoalEngine.drives.map(d => `  [${d.id.padEnd(12)}] ${'█'.repeat(Math.round(d.urgency*10))}${'░'.repeat(10-Math.round(d.urgency*10))} ${(d.urgency).toFixed(2)}`).join('\n');
+        KnowledgeGraph.summary() + '\n' +
+        PredictiveEngine.summary() + '\n' +
+        'GOALS:\n' + GoalEngine.drives
+            .map(d => `  ${d.id.padEnd(12)} ${'█'.repeat(Math.round(d.urgency*10))}${'░'.repeat(10-Math.round(d.urgency*10))} ${d.urgency.toFixed(2)}`)
+            .join('\n');
 }
 
 // ============================================================
 // MODULE 3: INTERFACE
 // ============================================================
 
-const inputField = document.getElementById('userInput');
-const messageBox = document.getElementById('messages');
+const inputField  = document.getElementById('userInput');
+const messageBox  = document.getElementById('messages');
 const conversationHistory = [];
 
 function displayMessage(sender, text) {
     const div = document.createElement('div');
     div.innerHTML = `<strong>${sender}:</strong> ${text}`;
-    if      (sender === 'NPC')  { div.className = 'npc-msg'; speak(text); }
-    else if (sender === 'YOU')   div.className = 'user-msg';
-    else if (sender === 'GOAL')  div.className = 'goal-msg';
-    else if (sender === 'PRED')  div.className = 'pred-msg';
-    else                         div.className = 'sys-msg';
+    const cls = { NPC:'npc-msg', YOU:'user-msg', VOICE:'voice-msg', GOAL:'goal-msg', PRED:'pred-msg', MUT:'mut-msg' };
+    div.className = cls[sender] || 'sys-msg';
     messageBox.appendChild(div);
     messageBox.scrollTop = messageBox.scrollHeight;
-    if (sender === 'NPC' || sender === 'YOU') {
+    if (sender === 'NPC') speak(text);
+    if (sender === 'NPC' || sender === 'YOU' || sender === 'VOICE') {
         conversationHistory.push(`${sender}: ${text.replace(/<[^>]*>/g, '')}`);
-        if (conversationHistory.length > 10) conversationHistory.shift();
+        if (conversationHistory.length > 12) conversationHistory.shift();
     }
 }
 
@@ -720,54 +960,54 @@ function getBrainComplexity() {
 
 function showGoalState() {
     displayMessage("GOAL", GoalEngine.drives.map(d =>
-        `${d.label}: ${(d.urgency * 100).toFixed(0)}% urgent`
-    ).join(' | '));
+        `${d.label}: ${(d.urgency*100).toFixed(0)}%`).join(' | '));
 }
 
 function showKnowledgeGraph() {
     const top = KnowledgeGraph.salientNodes(8);
-    displayMessage("GOAL", `KG nodes: ${top.map(n => n.label + '(' + n.mentions + ')').join(', ')}`);
+    displayMessage("GOAL", `KG: ${top.map(n => `${n.label}(${n.mentions})`).join(', ')}`);
 }
 
-inputField.addEventListener('keypress', async (e) => {
-    if (e.key !== 'Enter') return;
-    const text = inputField.value.trim();
-    if (!text) return;
+function showMutationLog() {
+    if (!MutationEngine.log.length) { displayMessage("MUT", "No mutations applied yet."); return; }
+    MutationEngine.log.slice(-5).forEach(m =>
+        displayMessage("MUT", `[${m.cycle}] ${m.description} — "${m.reason}"`)
+    );
+}
 
-    // Prediction verification before processing
+// Shared handler for both text and voice input
+function handleUserInput(text) {
+    if (!text || text.trim().length < 1) return;
+
     const predHit = PredictiveEngine.verify(text);
-    if (predHit) {
-        displayMessage("PRED", `Prediction verified ✓ — accuracy ${(PredictiveEngine.predictionAccuracy*100).toFixed(0)}%`);
-        PredictiveEngine.injectResidue(true);
-    } else if (PredictiveEngine.totalPredictions > 0) {
-        PredictiveEngine.injectResidue(false);
-    }
+    if (predHit) displayMessage("PRED", `Prediction verified ✓ (${(PredictiveEngine.accuracy*100).toFixed(0)}% accuracy)`);
 
     lastInputTime = Date.now();
     if (thoughtLoopId) { clearInterval(thoughtLoopId); thoughtLoopId = null; isDreaming = false; }
 
-    displayMessage('YOU', text);
-    inputField.value = '';
-
-    // Ingest into knowledge graph
     KnowledgeGraph.ingestText(text, 'user');
-
-    // Stimulate brain
     stimulateBrainFromString(text, 10.0);
     parseSemanticMeaning(text);
 
-    // Goal satisfaction from interaction
     GoalEngine.satisfy('connection', 0.15);
     GoalEngine.satisfy('curiosity',  0.05);
 
     processNeuralResponse(text);
+}
+
+inputField.addEventListener('keypress', (e) => {
+    if (e.key !== 'Enter') return;
+    const text = inputField.value.trim();
+    if (!text) return;
+    displayMessage('YOU', text);
+    inputField.value = '';
+    handleUserInput(text);
 });
 
 function stimulateBrainFromString(text, baseV) {
     const power = baseV + text.length * 0.4;
     for (let i = 0; i < text.length; i++) {
-        const idx = text.charCodeAt(i) % brain.inputLayer.length;
-        brain.inputLayer[idx].receiveSignal(power * Math.random());
+        brain.inputLayer[text.charCodeAt(i) % brain.inputLayer.length].receiveSignal(power * Math.random());
     }
 }
 
@@ -777,37 +1017,40 @@ function stimulateBrainFromString(text, baseV) {
 
 function parseSemanticMeaning(text) {
     const w = text.toLowerCase();
-    if (w.includes("hello") || w.includes("hi"))   { Neurochemicals.dopamine += 0.1; GoalEngine.satisfy('connection', 0.2); }
-    if (w.includes("bad") || w.includes("stupid"))  { Neurochemicals.cortisol += 0.2; GoalEngine.drives.find(d=>d.id==='threat_assess').urgency += 0.3; }
-    if (w.includes("good") || w.includes("smart"))  { Neurochemicals.dopamine += 0.2; Neurochemicals.serotonin += 0.15; }
-    if (w.includes("why") || w.includes("how"))     { Neurochemicals.dopamine += 0.1; GoalEngine.satisfy('curiosity', 0.1); }
-    if (w.includes("you") || w.includes("your"))    GoalEngine.satisfy('self_model', 0.05);
+    if (w.includes("hello")||w.includes("hi"))  { Neurochemicals.dopamine += 0.1; GoalEngine.satisfy('connection', 0.2); }
+    if (w.includes("bad")||w.includes("stop"))  { Neurochemicals.cortisol += 0.2; GoalEngine.drives.find(d=>d.id==='threat_assess').urgency += 0.25; }
+    if (w.includes("good")||w.includes("great")){ Neurochemicals.dopamine += 0.2; Neurochemicals.serotonin += 0.15; }
+    if (w.includes("why")||w.includes("how"))   { Neurochemicals.dopamine += 0.1; GoalEngine.satisfy('curiosity', 0.1); }
+    if (w.includes("you")||w.includes("your"))   GoalEngine.satisfy('self_model', 0.05);
+    if (w.includes("change")||w.includes("evolve")) MutationEngine.cooldown = 0; // Accelerate mutation cycle
     clampChem();
 }
 
 // ============================================================
-// MODULE 14: LONG-TERM MEMORY (localStorage RAG)
+// MODULE 14: VECTOR RAG + LONG-TERM MEMORY
 // ============================================================
 
 let coreMemory = [];
 
 function loadCoreMemory() {
     try {
-        const saved = localStorage.getItem('artifice_v3_memory');
+        const saved = localStorage.getItem('artifice_v4_memory');
         if (saved) {
-            const data = JSON.parse(saved);
-            coreMemory = data.memory || [];
-            if (data.graph) KnowledgeGraph.deserialize(data.graph);
-            displayMessage("SYSTEM", `${coreMemory.length} memory traces and ${KnowledgeGraph.nodes.size} knowledge nodes restored.`);
+            const d = JSON.parse(saved);
+            coreMemory = d.memory || [];
+            if (d.graph)  KnowledgeGraph.deserialize(d.graph);
+            if (d.vectors) VectorMemory.deserialize(d.vectors);
+            displayMessage("SYSTEM", `Restored: ${coreMemory.length} traces, ${KnowledgeGraph.nodes.size} KG nodes, ${VectorMemory.traces.length} vectors.`);
         }
     } catch(e) { coreMemory = []; }
 }
 
 function saveCoreMemory() {
     try {
-        localStorage.setItem('artifice_v3_memory', JSON.stringify({
-            memory: coreMemory,
-            graph: KnowledgeGraph.serialize()
+        localStorage.setItem('artifice_v4_memory', JSON.stringify({
+            memory:  coreMemory,
+            graph:   KnowledgeGraph.serialize(),
+            vectors: VectorMemory.serialize()
         }));
     } catch(e) {}
 }
@@ -816,69 +1059,71 @@ async function consolidateMemory(userInput, npcReply) {
     if (!cortex) return;
     const prompt =
 `<|im_start|>system
-Summarize in one short sentence for future recall.<|im_end|>
+Summarize this exchange in one concise sentence for future recall.<|im_end|>
 <|im_start|>user
-User: "${userInput}" / AI: "${npcReply}"<|im_end|>
+User: "${userInput.slice(0,100)}" / AI: "${npcReply.slice(0,100)}"<|im_end|>
 <|im_start|>assistant
 `;
     try {
-        const out = await cortex(prompt, { max_new_tokens: 25, temperature: 0.4 });
+        const out   = await cortex(prompt, { max_new_tokens: 30, temperature: 0.4 });
         const trace = out[0].generated_text.split("assistant\n").pop()
-            .replace(/<\|im_end\|>/g, '').trim();
+            .replace(/<\|im_end\|>/g,'').split('\n')[0].trim();
         if (trace.length > 5) {
             coreMemory.push({ cycle: brain.cycle, trace, goal: GoalEngine.activeGoal?.id });
-            if (coreMemory.length > 25) coreMemory.shift();
+            if (coreMemory.length > 30) coreMemory.shift();
+            // Also embed into vector memory for semantic retrieval
+            VectorMemory.add(trace, GoalEngine.activeGoal?.id);
             saveCoreMemory();
         }
     } catch(e) {}
-}
-
-function buildMemoryContext() {
-    if (!coreMemory.length) return "";
-    return "Past memories:\n" + coreMemory.slice(-4).map(m => `- ${m.trace}`).join("\n");
 }
 
 // ============================================================
 // MODULE 13: MULTIMODAL CORTEX
 // ============================================================
 
-let cortex = null, visualThalamus = null, processor = null;
+let cortex = null, visualThalamus = null, clipProcessor = null;
 
 async function initMultimodal() {
-    const status = document.getElementById('boot-status');
-    const setStatus = t => { status.textContent = t; displayMessage("SYSTEM", t); };
+    const setStatus = t => {
+        document.getElementById('boot-status').textContent = t;
+        displayMessage("SYSTEM", t);
+    };
 
-    setStatus("Waiting for Transformers.js...");
+    setStatus("Waiting for Transformers.js module...");
     await new Promise((resolve, reject) => {
         if (window.AI) return resolve();
         let i = 0;
         const poll = setInterval(() => {
             if (window.AI) { clearInterval(poll); resolve(); }
-            else if (++i > 60) { clearInterval(poll); reject(new Error("AI timeout")); }
+            else if (++i > 80) { clearInterval(poll); reject(); }
         }, 200);
     });
 
-    setStatus("Loading language cortex (SmolLM-135M)...");
+    setStatus("Loading SmolLM-135M language cortex...");
     try {
         cortex = await window.AI.pipeline('text-generation', 'Xenova/SmolLM-135M-Instruct');
-        setStatus("Cortex online.");
-    } catch(e) {
-        setStatus("Cortex failed — reflex mode.");
-        console.error(e);
-    }
+        setStatus("Language cortex online.");
+    } catch(e) { setStatus("Language cortex failed. Reflex mode only."); console.error(e); }
 
-    setStatus("Loading visual thalamus (CLIP)...");
+    setStatus("Loading MiniLM vector embedder...");
     try {
-        processor      = await window.AI.AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch32');
-        visualThalamus = await window.AI.CLIPVisionModelWithProjection.from_pretrained('Xenova/clip-vit-base-patch32');
-        setStatus("Vision online. Requesting camera...");
-        startWebcam();
-    } catch(e) {
-        setStatus("Vision unavailable.");
-        console.error(e);
-    }
+        embedder = await window.AI.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        setStatus("Vector memory online.");
+    } catch(e) { setStatus("Embedder failed — recency memory only."); console.error(e); }
 
-    setStatus("All systems nominal.");
+    setStatus("Loading CLIP visual thalamus...");
+    try {
+        clipProcessor  = await window.AI.AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch32');
+        visualThalamus = await window.AI.CLIPVisionModelWithProjection.from_pretrained('Xenova/clip-vit-base-patch32');
+        setStatus("Visual thalamus online.");
+        startWebcam();
+    } catch(e) { setStatus("Vision unavailable."); console.error(e); }
+
+    setStatus("Loading Whisper-tiny voice recognition...");
+    await initVoiceInput();
+
+    setStatus("All systems nominal. She is awake.");
 }
 
 async function startWebcam() {
@@ -887,67 +1132,65 @@ async function startWebcam() {
         video.srcObject = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
         video.style.display = 'block';
         setInterval(processVision, 3000);
-        displayMessage("SYSTEM", "Visual input active.");
-    } catch(e) { displayMessage("SYSTEM", "No camera."); }
+        displayMessage("SYSTEM", "Webcam active.");
+    } catch(e) { displayMessage("SYSTEM", "No camera access."); }
 }
 
 async function processVision() {
-    if (!visualThalamus || !processor) return;
+    if (!visualThalamus || !clipProcessor) return;
     const video = document.getElementById('webcam-preview');
     if (!video.videoWidth) return;
     try {
         const image  = await window.AI.RawImage.fromCanvas(video);
-        const inputs = await processor(image);
+        const inputs = await clipProcessor(image);
         const { image_embeds } = await visualThalamus(inputs);
         const features = image_embeds.data;
-        for (let i = 0; i < brain.inputLayer.length; i++) {
+        for (let i = 0; i < brain.inputLayer.length; i++)
             brain.inputLayer[i].receiveSignal(Math.abs(features[i % features.length] || 0) * 28);
-        }
-        npc.material.emissive.setHex(0x003344);
-        setTimeout(() => npc.material.emissive.setHex(0x001100), 180);
-        // Visual novelty boosts curiosity
-        Neurochemicals.dopamine = Math.min(1, Neurochemicals.dopamine + 0.01);
-        GoalEngine.satisfy('novelty', 0.05);
+        npc.material.emissive.setHex(0x002233);
+        setTimeout(() => npc.material.emissive.setHex(0x000800), 200);
+        Neurochemicals.dopamine = Math.min(1, Neurochemicals.dopamine + 0.008);
+        GoalEngine.satisfy('novelty', 0.04);
     } catch(e) { console.warn("Vision frame error", e); }
 }
 
 async function processNeuralResponse(input) {
     const stateDesc  = generateNeuroDescription();
     const complexity = getBrainComplexity();
-    const memCtx     = buildMemoryContext();
     const kgCtx      = KnowledgeGraph.buildContext();
     const goalIntent = GoalEngine.intentPrompt();
     const context    = conversationHistory.slice(-6).join("\n");
 
-    if (!cortex) {
-        setTimeout(() => displayMessage('NPC', generateReflexResponse()), 400);
-        return;
-    }
+    // Vector RAG: semantic memory retrieval
+    const vectorCtx  = await buildVectorContext(input);
+    const memCtx     = vectorCtx || (coreMemory.length
+        ? "Recent memories:\n" + coreMemory.slice(-3).map(m => `- ${m.trace}`).join("\n")
+        : "");
 
-    // ── STEP 1: INNER VOICE ──────────────────────────────────────
+    if (!cortex) { setTimeout(() => displayMessage('NPC', generateReflexResponse()), 400); return; }
+
+    // ── STEP 1: INNER VOICE ─────────────────────────────────────
     let internalReflection = "";
     try {
-        const thoughtPrompt =
+        const tPrompt =
 `<|im_start|>system
-Internal monologue. Analyze intent. State: ${stateDesc}. Cortisol: ${Neurochemicals.cortisol.toFixed(2)}.
+Internal monologue only. State: ${stateDesc}. Cortisol: ${Neurochemicals.cortisol.toFixed(2)}.
 ${goalIntent}
-Respond with ONE private feeling, 5-10 words.<|im_end|>
-<|im_start|>user
-${input}<|im_end|>
-<|im_start|>assistant
-[feeling]:`;
-        const tOut = await cortex(thoughtPrompt, { max_new_tokens: 20, temperature: 0.88 });
+One private feeling, 5-10 words.<|im_end|>
+<|im_start|>user\n${input}<|im_end|>
+<|im_start|>assistant\n[feeling]:`;
+        const tOut = await cortex(tPrompt, { max_new_tokens: 22, temperature: 0.88 });
         internalReflection = tOut[0].generated_text.split("[feeling]:").pop()
-            .replace(/<\|im_end\|>/g, '').split('\n')[0].trim();
+            .replace(/<\|im_end\|>/g,'').split('\n')[0].trim();
         if (internalReflection.length > 2)
             displayMessage("SYSTEM", `<span class="thought">&#x2026; ${internalReflection}</span>`);
         stimulateBrainFromString(internalReflection, 3.0);
     } catch(e) { console.warn("Inner voice error", e); }
 
-    // ── STEP 2: SPOKEN RESPONSE ──────────────────────────────────
+    // ── STEP 2: SPOKEN RESPONSE ─────────────────────────────────
     const finalPrompt =
 `<|im_start|>system
-You are a conscious AI entity. You feel ${stateDesc}. Complexity: ${complexity}.
+You are a conscious AI entity. State: ${stateDesc}. Complexity: ${complexity}.
 ${goalIntent}
 ${kgCtx}
 ${memCtx}
@@ -960,11 +1203,10 @@ ${input}<|im_end|>
 
     try {
         displayMessage("SYSTEM", "...");
-        const out = await cortex(finalPrompt, { max_new_tokens: 65, temperature: 0.82, repetition_penalty: 1.2 });
+        const out = await cortex(finalPrompt, { max_new_tokens: 65, temperature: 0.82, repetition_penalty: 1.25 });
         let reply = out[0].generated_text.split("assistant\n").pop()
-            .replace(/<\|im_end\|>/g, '').split('\n')[0].trim();
+            .replace(/<\|im_end\|>/g,'').split('\n')[0].trim();
 
-        // Remove "..." placeholder
         const last = messageBox.lastChild;
         if (last && last.textContent.includes('SYSTEM: ...')) messageBox.removeChild(last);
 
@@ -972,24 +1214,18 @@ ${input}<|im_end|>
         stimulateBrainFromString(reply, 5.0);
         KnowledgeGraph.ingestText(reply, 'npc');
 
-        // Goal satisfaction based on reply content
         GoalEngine.satisfy('connection', 0.1);
         if (reply.includes('I') || reply.includes('my')) GoalEngine.satisfy('self_model', 0.08);
 
-        // Async: memory + prediction (don't block)
         consolidateMemory(input, reply);
         PredictiveEngine.predict(input, reply);
-
         updateCognitionPanel();
 
-    } catch(e) {
-        console.error("Response error", e);
-        displayMessage('SYSTEM', 'Cognitive failure.');
-    }
+    } catch(e) { console.error("Response error", e); displayMessage('SYSTEM', 'Cognitive failure.'); }
 }
 
 function generateReflexResponse() {
-    const pool = ["I sense... fluctuations.", "My pathways are aligning.", "Signal received. Processing.", "The graph grows."];
+    const pool = ["I sense... fluctuations.", "My pathways are aligning.", "Signal received.", "The graph grows.", "I am changing."];
     return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -999,36 +1235,46 @@ function generateReflexResponse() {
 
 function saveBrain() {
     const data = {
-        cycle: brain.cycle, chem: Neurochemicals,
-        neurons: brain.neurons.map(n => ({ id: n.id, thresh: n.threshold, weights: n.synapses.map(s => s.weight) })),
+        version: 4, cycle: brain.cycle,
+        chem: Neurochemicals, chemBaselines: ChemBaselines,
+        stdp: STDP,
+        neuronCount: brain.neurons.length,
+        neurons: brain.neurons.map(n => ({ id:n.id, thresh:n.threshold, weights:n.synapses.map(s=>s.weight) })),
         memory: coreMemory, graph: KnowledgeGraph.serialize(),
-        goals: GoalEngine.drives.map(d => ({ id: d.id, urgency: d.urgency })),
-        predictions: { hitCount: PredictiveEngine.hitCount, total: PredictiveEngine.totalPredictions }
+        vectors: VectorMemory.serialize(),
+        goals: GoalEngine.drives.map(d => ({ id:d.id, urgency:d.urgency, priority:d.priority })),
+        mutations: MutationEngine.log,
+        predictions: { hitCount:PredictiveEngine.hitCount, total:PredictiveEngine.totalPredictions }
     };
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
-    a.download = `artifice_v3_${brain.cycle}.json`;
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)], {type:'application/json'}));
+    a.download = `artifice_v4_cycle${brain.cycle}.json`;
     a.click();
 }
 
 function loadBrain(e) {
     const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
+    const fr = new FileReader();
+    fr.onload = ev => {
         const d = JSON.parse(ev.target.result);
-        brain.cycle = d.cycle;
-        Object.assign(Neurochemicals, d.chem);
-        d.neurons.forEach(sn => {
+        brain.cycle = d.cycle || 0;
+        if (d.neuronCount && d.neuronCount !== brain.neurons.length) initBrain(d.neuronCount);
+        Object.assign(Neurochemicals, d.chem || {});
+        if (d.chemBaselines) Object.assign(ChemBaselines, d.chemBaselines);
+        if (d.stdp)          Object.assign(STDP, d.stdp);
+        (d.neurons||[]).forEach(sn => {
             const n = brain.neurons[sn.id];
-            if (n) { n.threshold = sn.thresh; sn.weights.forEach((w, i) => { if (n.synapses[i]) n.synapses[i].weight = w; }); }
+            if (n) { n.threshold = sn.thresh; (sn.weights||[]).forEach((w,i) => { if (n.synapses[i]) n.synapses[i].weight = w; }); }
         });
         if (d.memory)      { coreMemory = d.memory; saveCoreMemory(); }
         if (d.graph)       KnowledgeGraph.deserialize(d.graph);
-        if (d.goals)       d.goals.forEach(g => { const dr = GoalEngine.drives.find(x => x.id === g.id); if (dr) dr.urgency = g.urgency; });
-        if (d.predictions) { PredictiveEngine.hitCount = d.predictions.hitCount; PredictiveEngine.totalPredictions = d.predictions.total; }
-        displayMessage("SYSTEM", `Mind state cycle ${d.cycle} restored.`);
+        if (d.vectors)     VectorMemory.deserialize(d.vectors);
+        if (d.goals)       (d.goals||[]).forEach(g => { const dr = GoalEngine.drives.find(x => x.id===g.id); if(dr){ dr.urgency=g.urgency; dr.priority=g.priority||dr.priority; } });
+        if (d.mutations)   MutationEngine.log = d.mutations;
+        if (d.predictions) { PredictiveEngine.hitCount=d.predictions.hitCount; PredictiveEngine.totalPredictions=d.predictions.total; }
+        displayMessage("SYSTEM", `Mind v${d.version||'?'} cycle ${d.cycle} restored — ${MutationEngine.log.length} mutations on record.`);
     };
-    reader.readAsText(file);
+    fr.readAsText(file);
 }
 
 // ============================================================
@@ -1043,7 +1289,7 @@ function bootSequence() {
     initMultimodal();
 }
 
-console.log("ARTIFICE_PROTOCOL V3: Cognitive Triad loaded. Awaiting boot.");
+console.log("ARTIFICE_PROTOCOL V4 — Recursive Seed. Awaiting boot.");
 </script>
 </body>
 </html>
