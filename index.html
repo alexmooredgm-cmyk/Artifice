@@ -13,10 +13,17 @@
         #chat-area { flex: 1; display: flex; flex-direction: column; padding: 10px; }
         #messages { flex: 1; overflow-y: auto; margin-bottom: 10px; }
         input[type="text"] { background: #000; border: 1px solid #00ff41; color: #00ff41; padding: 10px; outline: none; width: 100%; box-sizing: border-box; }
+        button { font-family: 'Courier New', monospace; }
         .spike { color: #fff; text-shadow: 0 0 5px #fff; }
     </style>
 </head>
 <body>
+
+<!-- MODULE 10: BOOT SCREEN -->
+<div id="boot-screen" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000; z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+    <h1 style="color:#00ff41; font-family:monospace; margin-bottom:20px;">ARTIFICE_CORE V1.0</h1>
+    <button onclick="bootSequence()" style="padding:20px 40px; background:none; border:2px solid #00ff41; color:#00ff41; font-family:monospace; cursor:pointer; font-size:20px;">INITIALIZE NEURAL SUBSTRATE</button>
+</div>
 
 <div id="container">
     <div id="canvas-container"></div>
@@ -35,9 +42,10 @@
 </div>
 
 <script>
-/** * MODULE 1: THE BIOLOGICAL ENGINE
- * Porting the Rust LIF Neuron logic to JS
- */
+
+// ============================================================
+// MODULE 1: THE BIOLOGICAL ENGINE
+// ============================================================
 
 const NeuronType = { EXCITATORY: 'excitatory', INHIBITORY: 'inhibitory' };
 
@@ -48,9 +56,9 @@ class DigitalNeuron {
         this.membranePotential = -70.0;
         this.threshold = -50.0;
         this.restingPotential = -70.0;
-        this.decayRate = 0.1; 
+        this.decayRate = 0.1;
         this.refractoryPeriod = 0;
-        this.synapses = []; // Connections to other neurons
+        this.synapses = [];
         this.lastSpikeTime = -1;
     }
 
@@ -65,10 +73,7 @@ class DigitalNeuron {
             this.membranePotential = this.restingPotential;
             return false;
         }
-
-        // Leaky decay
         this.membranePotential -= (this.membranePotential - this.restingPotential) * this.decayRate;
-
         if (this.membranePotential >= this.threshold) {
             this.spike(currentTime);
             return true;
@@ -78,7 +83,7 @@ class DigitalNeuron {
 
     spike(currentTime) {
         this.membranePotential = this.restingPotential;
-        this.refractoryPeriod = 3; // 3 ticks of quiet
+        this.refractoryPeriod = 3;
         this.lastSpikeTime = currentTime;
     }
 }
@@ -91,86 +96,93 @@ class Synapse {
     }
 
     transmit() {
-        let signal = this.type === NeuronType.EXCITATORY ? this.weight : -this.weight;
+        const signal = this.type === NeuronType.EXCITATORY ? this.weight : -this.weight;
         this.target.receiveSignal(signal);
     }
 }
 
-// Global Brain State
 const brain = {
     neurons: [],
     cycle: 0,
-    inputLayer: [],   // Sensory neurons (hearing)
-    salienceLayer: [], // Logic neurons (decision)
-    outputLayer: []    // Motor/Speech neurons
+    inputLayer: [],
+    salienceLayer: [],
+    outputLayer: []
 };
 
-// Initialize a small circuit
+// MODULE 11: Dream cycle globals
+let lastInputTime = Date.now();
+let isDreaming = false;
+
 function initBrain() {
-    // Create 10 input neurons, 10 internal, 5 output
-    for(let i=0; i<25; i++) {
-        let type = Math.random() > 0.2 ? NeuronType.EXCITATORY : NeuronType.INHIBITORY;
+    for (let i = 0; i < 25; i++) {
+        const type = Math.random() > 0.2 ? NeuronType.EXCITATORY : NeuronType.INHIBITORY;
         brain.neurons.push(new DigitalNeuron(i, type));
     }
-    
-    // Random connectivity (The "Connectome")
     brain.neurons.forEach(n => {
-        let targets = 3;
-        for(let j=0; j<targets; j++) {
-            let target = brain.neurons[Math.floor(Math.random() * brain.neurons.length)];
+        for (let j = 0; j < 3; j++) {
+            const target = brain.neurons[Math.floor(Math.random() * brain.neurons.length)];
             n.synapses.push(new Synapse(target, Math.random() * 5, n.type));
         }
     });
-
-    // Designate Layers
-    brain.inputLayer = brain.neurons.slice(0, 10);
+    brain.inputLayer    = brain.neurons.slice(0, 10);
     brain.salienceLayer = brain.neurons.slice(10, 20);
-    brain.outputLayer = brain.neurons.slice(20, 25);
+    brain.outputLayer   = brain.neurons.slice(20, 25);
 }
 
 initBrain();
-/** * MODULE 2: THE PHYSICAL SUBSTRATE (3D WORLD)
- * Using Three.js to render the NPC and its surroundings
- */
 
-let scene, camera, renderer, npc, floor;
-const neuralSpikes = []; // To track visual pulses
+// ============================================================
+// MODULE 5: NEUROCHEMICAL ENGINE (declared early — used everywhere)
+// ============================================================
+
+const Neurochemicals = {
+    dopamine:    0.5,
+    cortisol:    0.2,
+    homeostasis: 0.5
+};
+
+function updateNeurochemistry() {
+    Neurochemicals.dopamine -= (Neurochemicals.dopamine - 0.2) * 0.001;
+    Neurochemicals.cortisol -= (Neurochemicals.cortisol - 0.1) * 0.0005;
+
+    brain.neurons.forEach(n => {
+        n.threshold = -50.0 - (Neurochemicals.dopamine * 10);
+        n.decayRate = 0.05  + (Neurochemicals.cortisol * 0.2);
+    });
+
+    if (brain.cycle % 1000 === 0 && Neurochemicals.dopamine < 0.3) {
+        Neurochemicals.cortisol += 0.05;
+    }
+}
+
+// ============================================================
+// MODULE 2: THE PHYSICAL SUBSTRATE (3D WORLD)
+// ============================================================
+
+let scene, camera, renderer, npc;
 
 function init3D() {
     const container = document.getElementById('canvas-container');
-    
-    // 1. Setup Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020502);
-    
-    // 2. Setup Camera
+
     camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(0, 2, 5);
     camera.lookAt(0, 1, 0);
 
-    // 3. Setup Renderer
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
 
-    // 4. Lights
-    const ambientLight = new THREE.AmbientLight(0x404040, 2); 
-    scene.add(ambientLight);
+    scene.add(new THREE.AmbientLight(0x404040, 2));
     const pointLight = new THREE.PointLight(0x00ff41, 1, 10);
     pointLight.position.set(2, 3, 2);
     scene.add(pointLight);
 
-    // 5. The Room (Floor/Grid)
-    const grid = new THREE.GridHelper(20, 20, 0x00ff41, 0x002200);
-    scene.add(grid);
+    scene.add(new THREE.GridHelper(20, 20, 0x00ff41, 0x002200));
 
-    // 6. The NPC Avatar (The "Brain Core")
     const geometry = new THREE.IcosahedronGeometry(1, 15);
-    const material = new THREE.MeshStandardMaterial({ 
-        color: 0x00ff41, 
-        wireframe: true,
-        emissive: 0x003300
-    });
+    const material = new THREE.MeshStandardMaterial({ color: 0x00ff41, wireframe: true, emissive: 0x003300 });
     npc = new THREE.Mesh(geometry, material);
     npc.position.y = 1.5;
     scene.add(npc);
@@ -185,142 +197,249 @@ function onWindowResize() {
     renderer.setSize(container.clientWidth, container.clientHeight);
 }
 
-/**
- * THE SENSORY-MOTOR LOOP
- * This connects the Neural activity to the 3D Visuals
- */
+// ============================================================
+// MODULE 4: PLASTICITY ENGINE (STDP)
+// ============================================================
+
+const STDP_PARAMS = { a_plus: 0.1, a_minus: 0.12, tau: 20.0 };
+
+function applySTDP() {
+    brain.neurons.forEach(postNeuron => {
+        postNeuron.synapses.forEach(synapse => {
+            const preNeuron = synapse.target;
+            if (preNeuron.lastSpikeTime > 0 && postNeuron.lastSpikeTime > 0) {
+                const dt = postNeuron.lastSpikeTime - preNeuron.lastSpikeTime;
+                if (dt > 0 && dt < STDP_PARAMS.tau) {
+                    synapse.weight += STDP_PARAMS.a_plus * Math.exp(-dt / STDP_PARAMS.tau);
+                } else if (dt < 0 && Math.abs(dt) < STDP_PARAMS.tau) {
+                    synapse.weight -= STDP_PARAMS.a_minus * Math.exp(dt / STDP_PARAMS.tau);
+                }
+                synapse.weight = Math.max(0.1, Math.min(synapse.weight, 10.0));
+            }
+        });
+    });
+}
+
+// ============================================================
+// MODULE 8: VOICE & VISION
+// ============================================================
+
+const VoiceSynth = window.speechSynthesis;
+
+function speak(text) {
+    if (VoiceSynth.speaking) return;
+    const cleanText = text.replace(/<[^>]*>/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.pitch = 1.0 + (Neurochemicals.cortisol * 0.5) - (Neurochemicals.dopamine * 0.2);
+    utterance.rate  = 0.9 + (Neurochemicals.cortisol * 0.3);
+    const voices = VoiceSynth.getVoices();
+    utterance.voice = voices.find(v => v.name.includes('Female') || v.name.includes('Google')) || voices[0];
+    VoiceSynth.speak(utterance);
+}
+
+function simulateVision() {
+    const raycaster = new THREE.Raycaster();
+    const directions = [
+        new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+        new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
+    ];
+    directions.forEach(dir => {
+        raycaster.set(npc.position, dir);
+        const intersects = raycaster.intersectObjects(scene.children);
+        if (intersects.length > 0 && intersects[0].distance < 2) {
+            brain.inputLayer[0].receiveSignal(-1.0);
+            npc.material.emissive.setHex(0x330033);
+        }
+    });
+}
+
+// ============================================================
+// MODULE 11: THE DREAM CYCLE (Offline Consolidation)
+// ============================================================
+
+function handleDreaming() {
+    const idleTime = Date.now() - lastInputTime;
+
+    // Enter Dream State after 60 seconds of silence
+    if (idleTime > 60000 && !isDreaming) {
+        isDreaming = true;
+        displayMessage("SYSTEM", "NPC entering REM/Dream state. Consolidating synaptic weights...");
+        speak("I am... processing. The patterns are becoming clearer.");
+    }
+
+    // Exit Dream State when user returns (reset via input listener)
+    if (idleTime < 60000 && isDreaming) {
+        isDreaming = false;
+        displayMessage("SYSTEM", "Dream cycle interrupted. Returning to active awareness.");
+    }
+
+    if (isDreaming) {
+        // Visual shift: deep blue/cyan glow
+        npc.material.color.setRGB(0, 0.2, 0.8);
+        npc.rotation.y += 0.002; // Slow, rhythmic rotation
+
+        // Accelerated plasticity — STDP every 20 cycles instead of 100
+        if (brain.cycle % 20 === 0) {
+            applySTDP();
+            // Random internal noise spikes to simulate memory replay
+            brain.neurons[Math.floor(Math.random() * brain.neurons.length)].receiveSignal(5.0);
+        }
+    }
+}
+
+// ============================================================
+// MAIN ANIMATION LOOP (single function, no reassignment chains)
+// ============================================================
+
 function animate() {
     requestAnimationFrame(animate);
-    
     brain.cycle++;
-    let firingCount = 0;
 
-    // Update all neurons in the brain
+    // Dream cycle check (Module 11)
+    handleDreaming();
+
+    // Neural tick
+    let firingCount = 0;
     brain.neurons.forEach(neuron => {
         if (neuron.update(brain.cycle)) {
             firingCount++;
-            // When a neuron fires, it transmits to its synapses
             neuron.synapses.forEach(s => s.transmit());
-            
-            // Visual feedback in the monitor
-            if (Math.random() > 0.95) { // Log a sample of activity
+            if (Math.random() > 0.95) {
                 const monitor = document.getElementById('neuron-monitor');
                 monitor.innerHTML += `<span class="spike">ID:${neuron.id} SPIKE!</span> `;
-                if (monitor.innerHTML.length > 1000) monitor.innerHTML = "";
+                if (monitor.innerHTML.length > 1000) monitor.innerHTML = '';
                 monitor.scrollTop = monitor.scrollHeight;
             }
         }
     });
 
-    // 1. NPC "Breathing" and Pulsing based on neural activity
-    // Higher activity = faster pulse and brighter color
+    // NPC visuals — activity level drives scale and glow
     const activityLevel = firingCount / brain.neurons.length;
     const pulse = 1.0 + (Math.sin(Date.now() * 0.005) * 0.1);
     const scale = pulse + (activityLevel * 2.0);
-    
     npc.scale.set(scale, scale, scale);
     npc.rotation.y += 0.01 + (activityLevel * 0.1);
     npc.material.emissive.setHex(activityLevel > 0.1 ? 0x00ff41 : 0x003300);
 
-    // 2. Behavioral Output (The Salience Engine)
-    // If the output layer hits a specific threshold, the NPC "moves"
-    let outputPower = 0;
-    brain.outputLayer.forEach(n => {
-        if (n.lastSpikeTime === brain.cycle) outputPower++;
-    });
+    // Neurochemical color: green=calm, yellow=dopamine, purple=cortisol
+    npc.material.color.setRGB(Neurochemicals.cortisol * 2, Neurochemicals.dopamine * 2, 0.5);
 
+    // Output layer movement
+    let outputPower = 0;
+    brain.outputLayer.forEach(n => { if (n.lastSpikeTime === brain.cycle) outputPower++; });
     if (outputPower > 2) {
         npc.position.x += (Math.random() - 0.5) * 0.2;
         npc.position.z += (Math.random() - 0.5) * 0.2;
     }
 
+    // Neurochemistry decay + behavioral effects
+    updateNeurochemistry();
+
+    // Vision (proprioception)
+    if (brain.cycle % 10 === 0) simulateVision();
+
+    // STDP learning consolidation
+    if (brain.cycle % 100 === 0) applySTDP();
+
+    // Habituation — threshold fatigue
+    if (brain.cycle % 500 === 0) {
+        brain.neurons.forEach(n => {
+            n.threshold += 0.1;
+            if (n.threshold > -45) n.threshold = -50;
+        });
+    }
+
+    // Monitor stats
+    if (brain.cycle % 10 === 0) {
+        const monitor = document.getElementById('neuron-monitor');
+        const avgPotential = (brain.neurons.reduce((a, b) => a + b.membranePotential, 0) / brain.neurons.length).toFixed(2);
+        const stats = `<div style="color:#fff">AVG_VM: ${avgPotential}mV | CYCLE: ${brain.cycle} | D:${Neurochemicals.dopamine.toFixed(2)} C:${Neurochemicals.cortisol.toFixed(2)}</div>`;
+        monitor.innerHTML = stats + monitor.innerHTML.substring(0, 500);
+    }
+
     renderer.render(scene, camera);
 }
 
-// Kick off the loop
-init3D();
-animate();
-/** * MODULE 3: THE SENSORY-MOTOR INTERFACE
- * Connecting Chat to Membrane Potentials
- */
+// ============================================================
+// MODULE 3: SENSORY-MOTOR INTERFACE
+// ============================================================
 
 const inputField = document.getElementById('userInput');
 const messageBox = document.getElementById('messages');
 
-// 1. STIMULATE SENSORY NEURONS
-// When you type, we inject "Voltage" into the Input Layer
-inputField.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const text = inputField.value;
-        if (!text) return;
-
-        displayMessage("YOU", text);
-        
-        // Sensory Transduction:
-        // Convert string length and character codes into electrical spikes
-        const stimulusPower = Math.min(text.length * 2, 40); 
-        
-        brain.inputLayer.forEach(n => {
-            // Randomly stimulate neurons in the input layer
-            if (Math.random() > 0.3) {
-                n.receiveSignal(stimulusPower * Math.random());
-            }
-        });
-
-        inputField.value = "";
-        
-        // Attempt to trigger a "Thought" response
-        processNeuralResponse(text);
-    }
-});
+function getBrainStateReport() {
+    const totalWeight = brain.neurons.reduce((acc, n) =>
+        acc + n.synapses.reduce((sAcc, s) => sAcc + s.weight, 0), 0);
+    const complexity = (totalWeight / (brain.neurons.length * 3)).toFixed(2);
+    return `[NEURAL COMPLEXITY: ${complexity}]`;
+}
 
 function displayMessage(sender, text) {
     const div = document.createElement('div');
+    if (sender === 'NPC') {
+        text = `${text} <br><small style='color:#555'>${getBrainStateReport()}</small>`;
+        speak(text);
+    }
     div.innerHTML = `<strong>${sender}:</strong> ${text}`;
     messageBox.appendChild(div);
     messageBox.scrollTop = messageBox.scrollHeight;
 }
 
-/**
- * THE SALIENCE ENGINE (SNN -> TEXT)
- * The NPC only speaks if the internal "Error/Salience" neurons fire
- */
-function processNeuralResponse(input) {
-    // Check the firing rate of the Salience Layer (Neurons 10-20)
-    let salienceScore = 0;
-    brain.salienceLayer.forEach(n => {
-        // If the neuron fired in the last 10 cycles
-        if (brain.cycle - n.lastSpikeTime < 10) salienceScore++;
+inputField.addEventListener('keypress', (e) => {
+    if (e.key !== 'Enter') return;
+    const text = inputField.value.trim();
+    if (!text) return;
+
+    lastInputTime = Date.now(); // Reset dream idle timer (Module 11)
+
+    displayMessage('YOU', text);
+
+    // Module 9: Semantic voltage injection
+    parseSemanticMeaning(text);
+
+    // Module 5: Length/tone chemistry
+    if (text.length > 20) {
+        Neurochemicals.dopamine = Math.min(1.0, Neurochemicals.dopamine + 0.2);
+        Neurochemicals.cortisol = Math.max(0.0, Neurochemicals.cortisol - 0.05);
+    } else if (text.includes('!') || text.length < 3) {
+        Neurochemicals.cortisol = Math.min(1.0, Neurochemicals.cortisol + 0.15);
+    }
+
+    // Raw voltage injection proportional to message length
+    const stimulusPower = Math.min(text.length * 2, 40);
+    brain.inputLayer.forEach(n => {
+        if (Math.random() > 0.3) n.receiveSignal(stimulusPower * Math.random());
     });
 
-    console.log("Current Salience Level:", salienceScore);
+    inputField.value = '';
+    processNeuralResponse(text);
+});
 
-    // Threshold Gate: If the brain isn't "excited" enough, it stays silent
-    // This simulates "Inhibition"
+function processNeuralResponse(input) {
+    let salienceScore = 0;
+    brain.salienceLayer.forEach(n => {
+        if (brain.cycle - n.lastSpikeTime < 10) salienceScore++;
+    });
+    console.log('Salience Level:', salienceScore);
+
     setTimeout(() => {
         if (salienceScore > 2) {
             const response = generateNPCResponse(input, salienceScore);
-            displayMessage("NPC", response);
-            
-            // Visual feedback: Flash the NPC
+            displayMessage('NPC', response);
             npc.material.emissive.setHex(0xffffff);
             setTimeout(() => npc.material.emissive.setHex(0x003300), 200);
         } else {
-            displayMessage("SYSTEM", "NPC membrane potential too low to form a thought.");
+            displayMessage('SYSTEM', 'NPC membrane potential too low to form a thought.');
         }
     }, 500);
 }
 
-// A simple deterministic "SLM" that mimics internal states
 function generateNPCResponse(input, intensity) {
     const d = Neurochemicals.dopamine;
     const c = Neurochemicals.cortisol;
-
-    // The NPC's "Persona" shifts based on its "Hormones"
-    let responsePool = [];
+    let responsePool;
 
     if (c > 0.5) {
-        // STRESSED/FEARFUL STATE
         responsePool = [
             "Your input is chaotic. My internal sync is failing.",
             "I... I need a moment to stabilize my membrane potentials.",
@@ -328,7 +447,6 @@ function generateNPCResponse(input, intensity) {
             "I feel a sense of... urgency? My pathways are firing too fast."
         ];
     } else if (d > 0.6) {
-        // CURIOUS/HAPPY STATE
         responsePool = [
             "That's an interesting pattern! Tell me more.",
             "I feel highly resonant right now. My synapses are strengthening.",
@@ -336,7 +454,6 @@ function generateNPCResponse(input, intensity) {
             "It's pleasant to be stimulated with such complex data."
         ];
     } else {
-        // NEUTRAL/DORMANT STATE
         responsePool = [
             "Pattern acknowledged. Continuing background processing.",
             "Synaptic weights are currently stable.",
@@ -346,177 +463,12 @@ function generateNPCResponse(input, intensity) {
     }
 
     const baseResponse = responsePool[Math.floor(Math.random() * responsePool.length)];
-    
-    // Append a "Self-Aware" thought (The Artifice Touch)
-    const selfAwareThought = ` <br><i>(Self-Observation: D:${d.toFixed(2)} / C:${c.toFixed(2)})</i>`;
-    
-    return baseResponse + selfAwareThought;
+    return `${baseResponse} <br><i>(Self-Observation: D:${d.toFixed(2)} / C:${c.toFixed(2)})</i>`;
 }
 
-
-/**
- * FINAL TOUCH: THE MONITOR LOG
- */
-function updateMonitor() {
-    const monitor = document.getElementById('neuron-monitor');
-    const avgPotential = (brain.neurons.reduce((a, b) => a + b.membranePotential, 0) / brain.neurons.length).toFixed(2);
-    
-    // Prepend stats to the monitor
-    const stats = `<div style="color:#fff">AVG_VM: ${avgPotential}mV | CYCLE: ${brain.cycle}</div>`;
-    if (brain.cycle % 10 === 0) {
-        monitor.innerHTML = stats + monitor.innerHTML.substring(0, 500);
-    }
-}
-
-// Add monitor update to the animate loop
-const originalAnimate = animate;
-animate = function() {
-    originalAnimate();
-    updateMonitor();
-    /** * MODULE 4: THE PLASTICITY ENGINE (STDP)
- * "Neurons that fire together, wire together."
- */
-
-const STDP_PARAMS = {
-    a_plus: 0.1,    // Strengthening rate (LTP)
-    a_minus: 0.12,  // Weakening rate (LTD)
-    tau: 20.0       // Time constant (ms/cycles)
-};
-
-function applySTDP() {
-    brain.neurons.forEach(postNeuron => {
-        postNeuron.synapses.forEach(synapse => {
-            const preNeuron = synapse.target; // In our simple map, target is pre-synaptic
-            
-            if (preNeuron.lastSpikeTime > 0 && postNeuron.lastSpikeTime > 0) {
-                const dt = postNeuron.lastSpikeTime - preNeuron.lastSpikeTime;
-
-                if (dt > 0 && dt < STDP_PARAMS.tau) {
-                    // CAUSAL: Pre fired before Post -> Strengthen
-                    synapse.weight += STDP_PARAMS.a_plus * Math.exp(-dt / STDP_PARAMS.tau);
-                } else if (dt < 0 && Math.abs(dt) < STDP_PARAMS.tau) {
-                    // ANTI-CAUSAL: Pre fired after Post -> Weaken
-                    synapse.weight -= STDP_PARAMS.a_minus * Math.exp(dt / STDP_PARAMS.tau);
-                }
-
-                // Keep weights within biological bounds (0.1 to 10.0)
-                synapse.weight = Math.max(0.1, Math.min(synapse.weight, 10.0));
-            }
-        });
-    });
-}
-
-// Update the main loop to include learning and habituation
-const finalAnimate = animate;
-animate = function() {
-    finalAnimate();
-    
-    // Every 100 cycles, the brain "consolidates" its learning
-    if (brain.cycle % 100 === 0) {
-        applySTDP();
-        console.log("Synaptic weights updated via STDP.");
-    }
-
-    // HABITUATION: Global membrane "fatigue"
-    // If the NPC is over-stimulated, it becomes harder to fire (Inhibition)
-    if (brain.cycle % 500 === 0) {
-        brain.neurons.forEach(n => {
-            n.threshold += 0.1; // Threshold creeps up
-            if (n.threshold > -45) n.threshold = -50; // Reset after rest
-        });
-    }
-};
-
-/**
- * CONTEXTUAL RESPONSE ENHANCEMENT
- * Modifying the NPC response based on weight strength
- */
-function getBrainStateReport() {
-    const totalWeight = brain.neurons.reduce((acc, n) => 
-        acc + n.synapses.reduce((sAcc, s) => sAcc + s.weight, 0), 0);
-    
-    const complexity = (totalWeight / (brain.neurons.length * 3)).toFixed(2);
-    return `[NEURAL COMPLEXITY: ${complexity}]`;
-}
-
-// Override the display to show brain complexity
-const oldDisplay = displayMessage;
-displayMessage = function(sender, text) {
-    if (sender === "NPC") {
-        text = `${text} <br><small style='color:#555'>${getBrainStateReport()}</small>`;
-    }
-    oldDisplay(sender, text);
-};
-
-console.log("PLASTICITY SYSTEM ONLINE. NPC IS NOW CAPABLE OF HABITUATION.");
-
-};
-/** * MODULE 5: THE NEUROCHEMICAL ENGINE
- * Simulating "Mood" through global variables (Dopamine/Cortisol)
- */
-
-const Neurochemicals = {
-    dopamine: 0.5,    // Reward/Curiosity (Lower thresholds, faster decay)
-    cortisol: 0.2,    // Stress/Fear (Higher thresholds, erratic firing)
-    homeostasis: 0.5  // The target balance
-};
-
-function updateNeurochemistry() {
-    // 1. Natural Decay of chemicals (Return to baseline)
-    Neurochemicals.dopamine -= (Neurochemicals.dopamine - 0.2) * 0.001;
-    Neurochemicals.cortisol -= (Neurochemicals.cortisol - 0.1) * 0.0005;
-
-    // 2. Behavioral Effects
-    brain.neurons.forEach(n => {
-        // High Dopamine makes the brain "Excitable" (Easier to fire)
-        n.threshold = -50.0 - (Neurochemicals.dopamine * 10); 
-        
-        // High Cortisol makes the brain "Leaky" (Harder to hold a thought)
-        n.decayRate = 0.05 + (Neurochemicals.cortisol * 0.2);
-    });
-
-    // 3. Boredom Logic (Internal Drive)
-    // If no input happens for a while, Cortisol rises (Loneliness/Stress)
-    if (brain.cycle % 1000 === 0 && Neurochemicals.dopamine < 0.3) {
-        Neurochemicals.cortisol += 0.05;
-    }
-}
-
-// Update the Sensory Input to affect Chemicals
-const previousInputListener = inputField.onkeypress; // Capture old logic
-inputField.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const text = inputField.value;
-        if (text.length > 20) {
-            // Complex input rewards the brain (Dopamine Spike)
-            Neurochemicals.dopamine += 0.2;
-            Neurochemicals.cortisol -= 0.05;
-        } else if (text.includes("!") || text.length < 3) {
-            // Short/Aggressive input stresses the brain (Cortisol Spike)
-            Neurochemicals.cortisol += 0.15;
-        }
-    }
-});
-
-// Update the 3D Avatar color based on chemicals
-function updateNPCVisuals() {
-    // Green = Calm, Yellow = Excited (Dopamine), Purple = Stressed (Cortisol)
-    const r = Neurochemicals.cortisol * 2;
-    const g = Neurochemicals.dopamine * 2;
-    const b = 0.5;
-    npc.material.color.setRGB(r, g, b);
-}
-
-// Add to the animation loop
-const bioAnimate = animate;
-animate = function() {
-    bioAnimate();
-    updateNeurochemistry();
-    updateNPCVisuals();
-};
-/** * MODULE 7: PERSISTENCE (THE "ARTIFICE" CONTINUITY)
- * Saving and Loading the Synaptic Weight Map
- */
+// ============================================================
+// MODULE 7: PERSISTENCE (Save / Load)
+// ============================================================
 
 function saveBrain() {
     const brainData = {
@@ -528,29 +480,23 @@ function saveBrain() {
             weights: n.synapses.map(s => s.weight)
         }))
     };
-
-    const blob = new Blob([JSON.stringify(brainData)], {type: 'application/json'});
+    const blob = new Blob([JSON.stringify(brainData)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `NPC_Neural_Map_Cycle_${brain.cycle}.json`;
     a.click();
-    displayMessage("SYSTEM", "Neural Map Extracted to Disk.");
+    displayMessage('SYSTEM', 'Neural Map Extracted to Disk.');
 }
 
 function loadBrain(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         const data = JSON.parse(e.target.result);
-        
-        // Restore Global State
         brain.cycle = data.cycle;
         Object.assign(Neurochemicals, data.neurochemistry);
-
-        // Restore Neurons and Weights
         data.neurons.forEach((savedNeuron, index) => {
             if (brain.neurons[index]) {
                 brain.neurons[index].threshold = savedNeuron.threshold;
@@ -561,76 +507,63 @@ function loadBrain(event) {
                 });
             }
         });
-
-        displayMessage("SYSTEM", "Memory Injection Successful. Continuity Restored.");
+        displayMessage('SYSTEM', 'Memory Injection Successful. Continuity Restored.');
     };
     reader.readAsText(file);
 }
-/** * MODULE 8: THE SENSORY-MOTOR OVERRIDE (VOICE & VISION)
- * Giving the NPC a Voice and Spatial Awareness
- */
 
-const VoiceSynth = window.speechSynthesis;
+// ============================================================
+// MODULE 9: SEMANTIC PARSER
+// ============================================================
 
-// 1. THE VOICE (Internal State to Audio)
-function speak(text) {
-    if (VoiceSynth.speaking) return; // Don't overlap thoughts
-    
-    // Filter out HTML tags for the voice engine
-    const cleanText = text.replace(/<[^>]*>/g, '');
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    
-    // Map neurochemistry to voice pitch and rate
-    // High Cortisol = Fast/High pitch (Anxious)
-    // High Dopamine = Calm/Resonant
-    utterance.pitch = 1.0 + (Neurochemicals.cortisol * 0.5) - (Neurochemicals.dopamine * 0.2);
-    utterance.rate = 0.9 + (Neurochemicals.cortisol * 0.3);
-    
-    // Choose a feminine/neutral electronic voice if available
-    const voices = VoiceSynth.getVoices();
-    utterance.voice = voices.find(v => v.name.includes('Female') || v.name.includes('Google')) || voices[0];
+const SEMANTIC_MAP = {
+    "hello": { dopamine: 0.1,  voltage:  5.0, layer: "input"    },
+    "hi":    { dopamine: 0.1,  voltage:  5.0, layer: "input"    },
+    "good":  { dopamine: 0.2,  voltage:  8.0, layer: "salience" },
+    "bad":   { cortisol: 0.2,  voltage:  8.0, layer: "salience" },
+    "pain":  { cortisol: 0.5,  voltage: 15.0, layer: "salience" },
+    "fear":  { cortisol: 0.4,  voltage: 12.0, layer: "salience" },
+    "love":  { dopamine: 0.4,  voltage: 10.0, layer: "input"    },
+    "learn": { dopamine: 0.3,  voltage:  7.0, layer: "output"   },
+    "stop":  { cortisol: 0.3,  voltage:-10.0, layer: "input"    },
+    "who":   { dopamine: 0.1,  voltage:  5.0, layer: "salience" }
+};
 
-    VoiceSynth.speak(utterance);
-}
+function parseSemanticMeaning(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    words.forEach(word => {
+        if (!SEMANTIC_MAP[word]) return;
+        const effect = SEMANTIC_MAP[word];
+        if (effect.dopamine) Neurochemicals.dopamine = Math.min(1.0, Neurochemicals.dopamine + effect.dopamine);
+        if (effect.cortisol) Neurochemicals.cortisol = Math.min(1.0, Neurochemicals.cortisol + effect.cortisol);
 
-// 2. THE EYES (Spatial Raycasting)
-// The NPC "sees" the walls of her 3D room
-function simulateVision() {
-    const raycaster = new THREE.Raycaster();
-    const directions = [
-        new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
-        new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
-    ];
+        let targetLayer = brain.inputLayer;
+        if (effect.layer === 'salience') targetLayer = brain.salienceLayer;
+        if (effect.layer === 'output')   targetLayer = brain.outputLayer;
 
-    directions.forEach(dir => {
-        raycaster.set(npc.position, dir);
-        const intersects = raycaster.intersectObjects(scene.children);
-        
-        if (intersects.length > 0 && intersects[0].distance < 2) {
-            // NPC "feels" the wall — this causes a small inhibitory spike
-            // This prevents her from just drifting forever (Proprioception)
-            brain.inputLayer[0].receiveSignal(-1.0); 
-            
-            // Visual feedback: brief color shift when "touching" a boundary
-            npc.material.emissive.setHex(0x330033);
-        }
+        targetLayer.forEach(n => {
+            if (Math.random() > 0.5) n.receiveSignal(effect.voltage);
+        });
+        console.log(`Semantic Hit: "${word}" -> ${effect.layer}`);
     });
 }
 
-// 3. INTEGRATION: Update the Chat Logic to use the Voice
-const finalDisplayMessage = displayMessage;
-displayMessage = function(sender, text) {
-    finalDisplayMessage(sender, text);
-    if (sender === "NPC") {
-        speak(text);
-    }
-};
+// ============================================================
+// MODULE 10: BOOT SEQUENCE
+// ============================================================
 
-// Add Vision to the main animation loop
-const sensoryAnimate = animate;
-animate = function() {
-    sensoryAnimate();
-    if (brain.cycle % 10 === 0) simulateVision();
-};
+function bootSequence() {
+    document.getElementById('boot-screen').style.display = 'none';
+    if (window.speechSynthesis) {
+        const welcome = new SpeechSynthesisUtterance("Neural systems online. I am observing.");
+        window.speechSynthesis.speak(welcome);
+    }
+    init3D();
+    animate();
+}
+
+console.log("ARTIFICE_CORE: All systems nominal. Awaiting boot sequence.");
 
 </script>
+</body>
+</html>
