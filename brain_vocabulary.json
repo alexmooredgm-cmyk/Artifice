@@ -1,0 +1,13 @@
+{
+  "concepts": {
+    "hello": { "type": "social", "dopamine": 0.1, "target_layer": "input" },
+    "hurt":  { "type": "threat", "cortisol": 0.4, "target_layer": "salience" },
+    "learn": { "type": "growth", "dopamine": 0.3, "target_layer": "output" },
+    "dark":  { "type": "sensory", "cortisol": 0.1, "target_layer": "input" }
+  },
+  "associations": [
+    ["light", "safe"],
+    ["quiet", "rest"],
+    ["noise", "stress"]
+  ]
+}
