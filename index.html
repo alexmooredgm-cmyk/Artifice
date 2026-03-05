@@ -665,11 +665,12 @@ const GoalEngine = {
     dominant() { return [...this.drives].sort((a, b) => (b.urgency * b.priority) - (a.urgency * a.priority))[0]; },
 
     tick() {
-        this.drives.forEach(d => { d.urgency = Math.max(0, Math.min(1, d.urgency + 0.0002)); });
-        this.drives.find(d=>d.id==='threat_assess').urgency += Neurochemicals.cortisol * 0.001;
-        this.drives.find(d=>d.id==='curiosity').urgency    += Neurochemicals.dopamine  * 0.0005;
-        const idleSec = (Date.now() - lastInputTime) / 1000;
-        this.drives.find(d=>d.id==='connection').urgency   += Math.min(idleSec * 0.00005, 0.001);
+        this.drives.forEach(d => { d.urgency = Math.max(0, Math.min(1, d.urgency + 0.00005)); }); // Slower natural build
+        this.drives.find(d=>d.id==='threat_assess').urgency += Neurochemicals.cortisol * 0.0003;
+        this.drives.find(d=>d.id==='curiosity').urgency    += Neurochemicals.dopamine  * 0.0001;
+        // Connection grows with idle time but caps the contribution
+        const idleSec = Math.min((Date.now() - lastInputTime) / 1000, 60); // Cap at 60s equivalent
+        this.drives.find(d=>d.id==='connection').urgency   += idleSec * 0.000002;
         this.activeGoal = this.dominant();
     },
 
@@ -914,12 +915,14 @@ function emitParticle() {
 
 function updateMonitor(firingCount) {
     const g = GoalEngine.activeGoal;
+    const cortexLine = cortex ? '✓ ONLINE' : '✗ LOADING...';
     document.getElementById('neuron-monitor').textContent =
 `CYCLE:  ${String(brain.cycle).padStart(7,'0')}  NEURONS: ${brain.neurons.length}
 ACTIVE: ${firingCount}/${brain.neurons.length}   AVG_VM: ${brain.state.avgPotential.toFixed(1)}mV
 CHEM:   D:${Neurochemicals.dopamine.toFixed(2)} S:${Neurochemicals.serotonin.toFixed(2)} C:${Neurochemicals.cortisol.toFixed(2)}
 STDP:   A+:${STDP.a_plus.toFixed(3)} A-:${STDP.a_minus.toFixed(3)} τ:${STDP.tau.toFixed(1)}
 GOAL:   [${g?.id||'---'}] urgency:${g?.urgency.toFixed(2)||'--'}
+CORTEX: ${cortexLine}
 STATE:  ${isDreaming?'DREAMING':'AWARE'} | MUT:${MutationEngine.log.length} | VM:${VectorMemory.traces.length}`;
 }
 
@@ -1304,46 +1307,78 @@ User: "${userInput.slice(0,100)}" / AI: "${npcReply.slice(0,100)}"<|im_end|>
 
 let cortex = null, visualThalamus = null, clipProcessor = null;
 
+// Global status reporter — works before AND after boot screen closes
+function sysStatus(msg) {
+    const el = document.getElementById('boot-status');
+    if (el) el.textContent = msg;
+    // Also log to chat if it exists
+    const box = document.getElementById('messages');
+    if (box) {
+        const div = document.createElement('div');
+        div.className = 'sys-msg';
+        div.innerHTML = `<strong>SYSTEM:</strong> ${msg}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+}
+
 async function initMultimodal() {
-    const setStatus = t => {
-        document.getElementById('boot-status').textContent = t;
-        displayMessage("SYSTEM", t);
-    };
+    sysStatus("Waiting for Transformers.js module...");
 
-    setStatus("Waiting for Transformers.js module...");
-    await new Promise((resolve, reject) => {
-        if (window.AI) return resolve();
-        let i = 0;
-        const poll = setInterval(() => {
-            if (window.AI) { clearInterval(poll); resolve(); }
-            else if (++i > 80) { clearInterval(poll); reject(); }
-        }, 200);
-    });
+    // Wait for ES module to populate window.AI
+    try {
+        await new Promise((resolve, reject) => {
+            if (window.AI) return resolve();
+            let i = 0;
+            const poll = setInterval(() => {
+                if (window.AI) { clearInterval(poll); resolve(); }
+                else if (++i > 80) { clearInterval(poll); reject(new Error("window.AI never loaded — check CDN")); }
+            }, 200);
+        });
+    } catch(e) {
+        sysStatus("FATAL: Transformers.js failed to load. Check your internet connection.");
+        return;
+    }
 
-    setStatus("Loading SmolLM-135M language cortex...");
+    // ── SmolLM language cortex ──────────────────────────────────
+    sysStatus("Loading SmolLM-135M language cortex (~270MB, cached after first load)...");
     try {
         cortex = await window.AI.pipeline('text-generation', 'Xenova/SmolLM-135M-Instruct');
-        setStatus("Language cortex online.");
-    } catch(e) { setStatus("Language cortex failed. Reflex mode only."); console.error(e); }
+        sysStatus("✓ Language cortex online. She can now think.");
+    } catch(e) {
+        sysStatus("✗ Language cortex failed — reflex mode only. Check console.");
+        console.error("SmolLM load error:", e);
+        // Don't return — continue loading other models
+    }
 
-    setStatus("Loading MiniLM vector embedder...");
+    // ── MiniLM vector embedder ──────────────────────────────────
+    sysStatus("Loading MiniLM-L6 vector embedder (~23MB)...");
     try {
         embedder = await window.AI.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-        setStatus("Vector memory online.");
-    } catch(e) { setStatus("Embedder failed — recency memory only."); console.error(e); }
+        sysStatus("✓ Vector memory online.");
+    } catch(e) {
+        sysStatus("✗ Embedder failed — recency memory only.");
+        console.error("MiniLM load error:", e);
+    }
 
-    setStatus("Loading CLIP visual thalamus...");
+    // ── CLIP visual thalamus ────────────────────────────────────
+    sysStatus("Loading CLIP visual thalamus (~170MB)...");
     try {
         clipProcessor  = await window.AI.AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch32');
         visualThalamus = await window.AI.CLIPVisionModelWithProjection.from_pretrained('Xenova/clip-vit-base-patch32');
-        setStatus("Visual thalamus online.");
+        sysStatus("✓ Visual thalamus online.");
         startWebcam();
-    } catch(e) { setStatus("Vision unavailable."); console.error(e); }
+    } catch(e) {
+        sysStatus("✗ Vision unavailable.");
+        console.error("CLIP load error:", e);
+    }
 
-    setStatus("Loading Whisper-tiny voice recognition...");
+    // ── Whisper voice input ─────────────────────────────────────
+    sysStatus("Loading Whisper-tiny voice recognition (~40MB)...");
     await initVoiceInput();
 
-    setStatus("All systems nominal. She is awake.");
+    const cortexStatus = cortex ? "CORTEX:ONLINE" : "CORTEX:OFFLINE(REFLEX)";
+    sysStatus(`Boot complete. ${cortexStatus} — type to begin.`);
 }
 
 async function startWebcam() {
