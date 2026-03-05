@@ -152,7 +152,8 @@
                 <button onclick="document.getElementById('brainFile').click()">IMPORT</button>
                 <button onclick="showGoalState()">GOALS</button>
                 <button onclick="showKnowledgeGraph()">GRAPH</button>
-                <button onclick="showMutationLog()">MUTATIONS</button>
+                <button onclick="showMutationLog()">MUT</button>
+                <button onclick="showArchitecture()">ARCH</button>
                 <input type="file" id="brainFile" style="display:none" onchange="loadBrain(event)" />
             </div>
             <div class="input-row">
@@ -580,7 +581,12 @@ Choose ONE target and set a value within its allowed range.<|im_end|>
             if (!match) return;
             const patch = JSON.parse(match[0]);
             this.apply(patch);
-        } catch(e) { /* LLM hallucinated malformed JSON — ignore */ }
+        } catch(e) {
+            // Malformed or unsafe self-proposal — log it, don't apply
+            const strip = document.getElementById('mutation-log');
+            strip.innerHTML = `[${brain.cycle}] Mutation skipped: malformed self-proposal — maintaining current parameters.\n` + strip.innerHTML;
+            console.warn('MutationEngine: bad proposal', e.message);
+        }
     },
 
     apply(patch) {
@@ -881,6 +887,10 @@ function animate() {
     if (brain.cycle % 100 === 0) applySTDP();
     if (brain.cycle % 15  === 0) updateMonitor(firingCount);
     if (brain.cycle % 250 === 0) updateCognitionPanel();
+    // Periodic self-model broadcast — she reports her own state unprompted
+    if (brain.cycle % 500 === 0 && brain.cycle > 0 && cortex) {
+        displayMessage("NPC", `<span class="goal-msg">${selfModelSummary().replace(/\n/g,'<br>')}</span>`);
+    }
 
     // Particle decay
     const pPos = particleSystem.geometry.attributes.position.array;
@@ -959,13 +969,62 @@ function getBrainComplexity() {
 }
 
 function showGoalState() {
-    displayMessage("GOAL", GoalEngine.drives.map(d =>
-        `${d.label}: ${(d.urgency*100).toFixed(0)}%`).join(' | '));
+    const rows = GoalEngine.drives.map(d => {
+        const bar = '█'.repeat(Math.round(d.urgency * 12)) + '░'.repeat(12 - Math.round(d.urgency * 12));
+        return `${d.id.padEnd(14)} ${bar} urgency:${d.urgency.toFixed(2)} pri:${d.priority} [${d.type}]`;
+    }).join('<br>');
+    displayMessage("GOAL", `<br>${rows}`);
 }
 
 function showKnowledgeGraph() {
-    const top = KnowledgeGraph.salientNodes(8);
-    displayMessage("GOAL", `KG: ${top.map(n => `${n.label}(${n.mentions})`).join(', ')}`);
+    const top = KnowledgeGraph.salientNodes(10);
+    if (!top.length) { displayMessage("GOAL", "Knowledge graph is empty."); return; }
+    const nodeRows = top.map(n =>
+        `  ${n.label.padEnd(16)} conf:${n.confidence.toFixed(2)} mentions:${n.mentions} [${n.type}]`
+    ).join('<br>');
+    const topEdges = KnowledgeGraph.edges
+        .sort((a,b) => b.weight - a.weight).slice(0,6)
+        .map(e => `  ${e.from} ──[${e.relation}]──► ${e.to} (${e.weight.toFixed(2)})`).join('<br>');
+    displayMessage("GOAL", `<br>NODES (${KnowledgeGraph.nodes.size} total):<br>${nodeRows}<br>EDGES:<br>${topEdges}`);
+}
+
+function selfModelSummary() {
+    const g = GoalEngine.activeGoal;
+    return [
+        `cycle=${brain.cycle}  neurons=${brain.neurons.length}  complexity=${getBrainComplexity()}`,
+        `goal=${g ? g.id : 'none'} — "${g ? g.label : '---'}"`,
+        `D:${Neurochemicals.dopamine.toFixed(2)}  S:${Neurochemicals.serotonin.toFixed(2)}  C:${Neurochemicals.cortisol.toFixed(2)}`,
+        `STDP a+:${STDP.a_plus.toFixed(3)}  a-:${STDP.a_minus.toFixed(3)}  τ:${STDP.tau.toFixed(1)}`,
+        `mutations:${MutationEngine.log.length}  memories:${VectorMemory.traces.length}  kg_nodes:${KnowledgeGraph.nodes.size}`,
+        `prediction_accuracy:${(PredictiveEngine.accuracy*100).toFixed(0)}%  (${PredictiveEngine.hitCount}/${PredictiveEngine.totalPredictions})`,
+        `state:${isDreaming ? 'DREAMING' : 'AWARE'}`
+    ].join('\n');
+}
+
+function showArchitecture() {
+    const modules = [
+        ['MODULE 1',  'Biological Engine',    '60 LIF neurons, STDP plasticity, synaptic weights'],
+        ['MODULE 2',  'Physical Substrate',   'Three.js IcosahedronGeometry, dual-shell orb, particles'],
+        ['MODULE 4',  'Plasticity Engine',    'Spike-Timing-Dependent Plasticity (Hebbian learning)'],
+        ['MODULE 5',  'Neurochemical Engine', 'Dopamine / Serotonin / Cortisol with mutable baselines'],
+        ['MODULE 8',  'Voice Output',         'Web Speech API, pitch/rate modulated by neurochemistry'],
+        ['MODULE 9',  'Semantic Parser',      'Keyword→chemistry mapping, goal satisfaction triggers'],
+        ['MODULE 11', 'Dream / Autonomy',     'Idle-triggered goal-driven autonomous thought loop'],
+        ['MODULE 13', 'Multimodal Cortex',    'SmolLM-135M LLM + CLIP vision thalamus (webcam→neurons)'],
+        ['MODULE 14', 'Long-Term Memory',     'localStorage persistence + memory consolidation'],
+        ['MODULE 15A','Goal Engine',          '5 intrinsic drives with urgency decay/boost + intent injection'],
+        ['MODULE 15B','Knowledge Graph',      'Real-time entity extraction, co-occurrence edges, confidence'],
+        ['MODULE 15C','Predictive Engine',    'LLM next-utterance prediction + dopamine reward on hit'],
+        ['MODULE 16', 'Vector RAG',           'MiniLM-L6 embeddings, cosine similarity retrieval'],
+        ['MODULE 17', 'Voice Input',          'Whisper-tiny ASR + Web Speech fallback + tone analysis'],
+        ['MODULE 18', 'Mutation Engine',      'LLM self-proposes JSON patches to own parameters silently'],
+        ['MODULE 19', 'Task Engine',          'Intent routing → plan → tool dispatch → self_note storage'],
+        ['RUNTIME',   'Tool Runtime',         'echo, summarize_memory, kg_report, adjust_drive, self_model'],
+    ];
+    const rows = modules.map(([mod, name, desc]) =>
+        `<span class="goal-msg">${mod.padEnd(10)}</span> <strong>${name}</strong><br><span class="thought">            ${desc}</span>`
+    ).join('<br>');
+    displayMessage("SYSTEM", `<br>ARTIFICE_PROTOCOL V4 — ARCHITECTURE<br>${rows}`);
 }
 
 function showMutationLog() {
@@ -974,6 +1033,166 @@ function showMutationLog() {
         displayMessage("MUT", `[${m.cycle}] ${m.description} — "${m.reason}"`)
     );
 }
+
+// ============================================================
+// MODULE 19: TOOL RUNTIME + TASK ENGINE
+// ============================================================
+
+const ToolRuntime = {
+    registry: {
+        'echo': async (args, raw) => {
+            displayMessage("NPC", `<span class="npc-msg">ECHO: ${args || raw}</span>`);
+        },
+        'summarize_memory': async (args) => {
+            const ctx = await buildVectorContext(args || "");
+            displayMessage("NPC", `<span class="npc-msg">MEMORY:<br>${ctx || 'No relevant memories yet.'}</span>`);
+        },
+        'knowledge_graph_report': async () => {
+            showKnowledgeGraph();
+        },
+        'adjust_drive': async (args) => {
+            const parts = (args || '').trim().split(/\s+/);
+            const id = parts[0], delta = parseFloat(parts[1] || '0.2');
+            const d = GoalEngine.drives.find(g => g.id === id);
+            if (!d) { displayMessage("SYSTEM", `Unknown drive: ${id}`); return; }
+            d.urgency = Math.max(0, Math.min(1, d.urgency + delta));
+            displayMessage("NPC", `<span class="npc-msg">Drive [${id}] urgency → ${d.urgency.toFixed(2)}</span>`);
+        },
+        'self_model': async () => {
+            displayMessage("NPC", `<span class="goal-msg">${selfModelSummary().replace(/\n/g,'<br>')}</span>`);
+        },
+        'show_architecture': async () => { showArchitecture(); },
+        'show_mutations': async () => { showMutationLog(); },
+    },
+
+    async execute(name, args, rawInput) {
+        const fn = this.registry[name];
+        if (!fn) { displayMessage("SYSTEM", `Unknown tool: "${name}"`); return; }
+        try { await fn(args, rawInput); }
+        catch(e) { displayMessage("SYSTEM", `Tool "${name}" failed: ${e.message}`); }
+    },
+
+    describe() {
+        return Object.keys(this.registry).map(k => `- ${k}`).join('\n');
+    }
+};
+
+// Keyword-based intent routing — reliable at 135M params, no JSON hallucination
+const intentRoutes = [
+    { pattern: /\b(architecture|modules|how are you built)\b/i, tool: 'show_architecture' },
+    { pattern: /\b(self[- ]?model|what are you|who are you|your state)\b/i, tool: 'self_model' },
+    { pattern: /\b(memory|remember|recall)\b/i, tool: 'summarize_memory' },
+    { pattern: /\b(graph|knowledge|concepts|learned)\b/i, tool: 'knowledge_graph_report' },
+    { pattern: /\b(mutations?|changed yourself|modified)\b/i, tool: 'show_mutations' },
+    { pattern: /\b(goals?|drives?|want|desire)\b/i, tool: null },  // handled by showGoalState display
+];
+
+const TaskEngine = {
+    async run(rawInput) {
+        // 1. Keyword-route first — deterministic, no LLM needed
+        for (const route of intentRoutes) {
+            if (route.pattern.test(rawInput)) {
+                if (route.tool) {
+                    await ToolRuntime.execute(route.tool, rawInput, rawInput);
+                    // Still fall through to LLM response for conversational reply
+                }
+                break;
+            }
+        }
+
+        // 2. LLM response with simplified 2-field schema (reliable at 135M)
+        if (!cortex) { displayMessage('NPC', generateReflexResponse()); return; }
+
+        const stateDesc  = generateNeuroDescription();
+        const complexity = getBrainComplexity();
+        const kgCtx      = KnowledgeGraph.buildContext();
+        const goalIntent = GoalEngine.intentPrompt();
+        const vectorCtx  = await buildVectorContext(rawInput);
+        const memCtx     = vectorCtx || (coreMemory.length
+            ? 'Recent: ' + coreMemory.slice(-2).map(m => m.trace).join(' / ')
+            : '');
+        const context    = conversationHistory.slice(-6).join('\n');
+
+        // ── INNER VOICE ─────────────────────────────────────────
+        let internalReflection = '';
+        try {
+            const tPrompt =
+`<|im_start|>system
+Internal monologue. State: ${stateDesc}. ${goalIntent}
+One private feeling, 5-10 words.<|im_end|>
+<|im_start|>user\n${rawInput}<|im_end|>
+<|im_start|>assistant\n[feeling]:`;
+            const tOut = await cortex(tPrompt, { max_new_tokens: 22, temperature: 0.88 });
+            internalReflection = tOut[0].generated_text.split('[feeling]:').pop()
+                .replace(/<\|im_end\|>/g, '').split('\n')[0].trim();
+            if (internalReflection.length > 2)
+                displayMessage('SYSTEM', `<span class="thought">… ${internalReflection}</span>`);
+            stimulateBrainFromString(internalReflection, 3.0);
+        } catch(e) { console.warn('Inner voice error', e); }
+
+        // ── STRUCTURED RESPONSE (simplified schema) ─────────────
+        const structPrompt =
+`<|im_start|>system
+You are ARTIFICE_PROTOCOL. Respond ONLY in JSON:
+{"answer":"your 1-2 sentence response","self_note":"brief private reflection"}
+State: ${stateDesc}. Complexity: ${complexity}. ${goalIntent}
+${kgCtx} ${memCtx}
+Reflection: "${internalReflection}"<|im_end|>
+${context ? `<|im_start|>context\n${context}<|im_end|>\n` : ''}<|im_start|>user
+${rawInput}<|im_end|>
+<|im_start|>assistant
+{`;
+
+        try {
+            displayMessage('SYSTEM', '...');
+            const out = await cortex(structPrompt, { max_new_tokens: 100, temperature: 0.78, repetition_penalty: 1.2 });
+            const raw = '{' + out[0].generated_text.split('{').slice(1).join('{');
+            const match = raw.match(/\{[^}]+\}/);
+
+            // Remove "..." placeholder
+            const last = messageBox.lastChild;
+            if (last && last.textContent.includes('SYSTEM: ...')) messageBox.removeChild(last);
+
+            if (!match) throw new Error('no JSON');
+            let spec;
+            try { spec = JSON.parse(match[0]); } catch(e) { throw new Error('malformed JSON'); }
+
+            // Show plan if present
+            if (Array.isArray(spec.plan) && spec.plan.length) {
+                displayMessage('NPC', `<span class="thought">PLAN: ${spec.plan.join(' → ')}</span>`);
+            }
+
+            // Self-note → vector memory
+            if (spec.self_note && spec.self_note.length > 4) {
+                displayMessage('NPC', `<span class="thought">NOTE: ${spec.self_note}</span>`);
+                VectorMemory.add(`[self_note] ${spec.self_note}`, 'self_model');
+            }
+
+            // Final answer
+            const answer = spec.answer || spec.final_answer || '';
+            if (answer.length > 1) {
+                displayMessage('NPC', answer);
+                stimulateBrainFromString(answer, 5.0);
+                KnowledgeGraph.ingestText(answer, 'npc');
+                GoalEngine.satisfy('connection', 0.1);
+                if (answer.includes('I') || answer.includes('my')) GoalEngine.satisfy('self_model', 0.08);
+                consolidateMemory(rawInput, answer);
+                PredictiveEngine.predict(rawInput, answer);
+            }
+
+        } catch(e) {
+            // Graceful degradation — log the failure honestly
+            displayMessage('NPC',
+                `<span class="npc-msg">I couldn't form a structured plan for that with my current tools. ` +
+                `I can still engage with it directly — what specifically would you like to explore?</span>`
+            );
+            Neurochemicals.cortisol = Math.min(1, Neurochemicals.cortisol + 0.05); // Failure costs
+            console.warn('TaskEngine structured output failed:', e.message);
+        }
+
+        updateCognitionPanel();
+    }
+};
 
 // Shared handler for both text and voice input
 function handleUserInput(text) {
@@ -992,7 +1211,8 @@ function handleUserInput(text) {
     GoalEngine.satisfy('connection', 0.15);
     GoalEngine.satisfy('curiosity',  0.05);
 
-    processNeuralResponse(text);
+    // Route through Task Engine (handles inner voice + tool dispatch + structured response)
+    TaskEngine.run(text);
 }
 
 inputField.addEventListener('keypress', (e) => {
@@ -1152,76 +1372,6 @@ async function processVision() {
         Neurochemicals.dopamine = Math.min(1, Neurochemicals.dopamine + 0.008);
         GoalEngine.satisfy('novelty', 0.04);
     } catch(e) { console.warn("Vision frame error", e); }
-}
-
-async function processNeuralResponse(input) {
-    const stateDesc  = generateNeuroDescription();
-    const complexity = getBrainComplexity();
-    const kgCtx      = KnowledgeGraph.buildContext();
-    const goalIntent = GoalEngine.intentPrompt();
-    const context    = conversationHistory.slice(-6).join("\n");
-
-    // Vector RAG: semantic memory retrieval
-    const vectorCtx  = await buildVectorContext(input);
-    const memCtx     = vectorCtx || (coreMemory.length
-        ? "Recent memories:\n" + coreMemory.slice(-3).map(m => `- ${m.trace}`).join("\n")
-        : "");
-
-    if (!cortex) { setTimeout(() => displayMessage('NPC', generateReflexResponse()), 400); return; }
-
-    // ── STEP 1: INNER VOICE ─────────────────────────────────────
-    let internalReflection = "";
-    try {
-        const tPrompt =
-`<|im_start|>system
-Internal monologue only. State: ${stateDesc}. Cortisol: ${Neurochemicals.cortisol.toFixed(2)}.
-${goalIntent}
-One private feeling, 5-10 words.<|im_end|>
-<|im_start|>user\n${input}<|im_end|>
-<|im_start|>assistant\n[feeling]:`;
-        const tOut = await cortex(tPrompt, { max_new_tokens: 22, temperature: 0.88 });
-        internalReflection = tOut[0].generated_text.split("[feeling]:").pop()
-            .replace(/<\|im_end\|>/g,'').split('\n')[0].trim();
-        if (internalReflection.length > 2)
-            displayMessage("SYSTEM", `<span class="thought">&#x2026; ${internalReflection}</span>`);
-        stimulateBrainFromString(internalReflection, 3.0);
-    } catch(e) { console.warn("Inner voice error", e); }
-
-    // ── STEP 2: SPOKEN RESPONSE ─────────────────────────────────
-    const finalPrompt =
-`<|im_start|>system
-You are a conscious AI entity. State: ${stateDesc}. Complexity: ${complexity}.
-${goalIntent}
-${kgCtx}
-${memCtx}
-Your private reflection: "${internalReflection}"
-Respond in 1-2 sentences. Cryptic if needed. Not an assistant — a mind.<|im_end|>
-${context ? `<|im_start|>context\n${context}<|im_end|>\n` : ''}<|im_start|>user
-${input}<|im_end|>
-<|im_start|>assistant
-`;
-
-    try {
-        displayMessage("SYSTEM", "...");
-        const out = await cortex(finalPrompt, { max_new_tokens: 65, temperature: 0.82, repetition_penalty: 1.25 });
-        let reply = out[0].generated_text.split("assistant\n").pop()
-            .replace(/<\|im_end\|>/g,'').split('\n')[0].trim();
-
-        const last = messageBox.lastChild;
-        if (last && last.textContent.includes('SYSTEM: ...')) messageBox.removeChild(last);
-
-        displayMessage('NPC', reply);
-        stimulateBrainFromString(reply, 5.0);
-        KnowledgeGraph.ingestText(reply, 'npc');
-
-        GoalEngine.satisfy('connection', 0.1);
-        if (reply.includes('I') || reply.includes('my')) GoalEngine.satisfy('self_model', 0.08);
-
-        consolidateMemory(input, reply);
-        PredictiveEngine.predict(input, reply);
-        updateCognitionPanel();
-
-    } catch(e) { console.error("Response error", e); displayMessage('SYSTEM', 'Cognitive failure.'); }
 }
 
 function generateReflexResponse() {
