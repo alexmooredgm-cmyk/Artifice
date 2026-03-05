@@ -120,36 +120,38 @@
         ::-webkit-scrollbar-thumb { background: #00ff4133; }
     </style>
 
-    <!-- Stable v2 for text-generation and feature-extraction pipelines -->
+    <!-- @huggingface/transformers v3 — official successor, proper CORS, all classes available -->
     <script type="module">
         try {
-            const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js');
-            window._pipeline = pipeline;
+            const { pipeline, AutoProcessor, CLIPVisionModelWithProjection, RawImage, env } =
+                await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.1.2');
+
+            // Allow remote model downloads
+            env.allowRemoteModels  = true;
+            env.allowLocalModels   = false;
+
+            window._pipeline    = pipeline;
+            window._AutoProcessor = AutoProcessor;
+            window._CLIPVision  = CLIPVisionModelWithProjection;
+            window._RawImage    = RawImage;
             window._pipelineReady = true;
-            console.log('[Transformers v2] pipeline ready');
+            window._clipReady     = true;
+            console.log('[HF Transformers v3.1.2] all classes ready');
         } catch(e) {
-            console.error('[Transformers v2] failed:', e);
-            window._pipelineReady = false;
-        }
-    </script>
-    <!-- Alpha v3 for CLIP vision classes (not available in v2 as named exports) -->
-    <script type="module">
-        try {
-            const mod = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@3.0.0-alpha.0');
-            window._clipReady = true;
-            window._AutoProcessor = mod.AutoProcessor;
-            window._CLIPVision = mod.CLIPVisionModelWithProjection;
-            window._RawImage = mod.RawImage;
-            // Also grab pipeline from v3 as fallback if v2 failed
-            if (!window._pipelineReady) {
-                window._pipeline = mod.pipeline;
+            console.error('[HF Transformers] import failed:', e);
+            // Fallback to xenova v2
+            try {
+                const { pipeline } =
+                    await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js');
+                window._pipeline      = pipeline;
                 window._pipelineReady = true;
-                console.log('[Transformers v3 fallback] pipeline ready');
+                window._clipReady     = false;
+                console.log('[Xenova v2 fallback] pipeline ready, no CLIP');
+            } catch(e2) {
+                console.error('[Xenova v2 fallback] also failed:', e2);
+                window._pipelineReady = false;
+                window._clipReady     = false;
             }
-            console.log('[Transformers v3] CLIP classes ready');
-        } catch(e) {
-            console.error('[Transformers v3] failed:', e);
-            window._clipReady = false;
         }
     </script>
 </head>
@@ -1499,13 +1501,25 @@ async function initMultimodal() {
 
     // ── SmolLM language cortex ──────────────────────────────────
     sysStatus("Loading SmolLM-135M (~270MB, cached after first load)...");
-    try {
-        cortex = await window._pipeline('text-generation', 'Xenova/SmolLM-135M-Instruct');
-        sysStatus("✓ Language cortex ONLINE — she can now think.");
-    } catch(e) {
-        sysStatus(`✗ SmolLM failed: ${e.message}`);
-        console.error("SmolLM load error:", e);
+    // Try q4 quantized first (smaller/faster), fall back to full
+    const smolModels = [
+        'HuggingFaceTB/SmolLM-135M-Instruct',   // official HF repo
+        'Xenova/SmolLM-135M-Instruct',            // Xenova mirror
+    ];
+    for (const modelId of smolModels) {
+        try {
+            sysStatus(`Trying ${modelId}...`);
+            cortex = await window._pipeline('text-generation', modelId, {
+                dtype: 'q4',   // quantized = smaller download, faster
+            });
+            sysStatus(`✓ Language cortex ONLINE (${modelId}).`);
+            break;
+        } catch(e) {
+            sysStatus(`✗ ${modelId} failed: ${e.message}`);
+            console.error(`${modelId} error:`, e);
+        }
     }
+    if (!cortex) sysStatus("✗ All SmolLM sources failed — reflex mode only.");
 
     // ── MiniLM vector embedder ──────────────────────────────────
     sysStatus("Loading MiniLM-L6 embedder (~23MB)...");
@@ -1555,7 +1569,7 @@ async function processVision() {
     const video = document.getElementById('webcam-preview');
     if (!video.videoWidth) return;
     try {
-        const image  = await window.AI.RawImage.fromCanvas(video);
+        const image  = await window._RawImage.fromCanvas(video);
         const inputs = await clipProcessor(image);
         const { image_embeds } = await visualThalamus(inputs);
         const features = image_embeds.data;
