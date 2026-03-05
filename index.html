@@ -120,11 +120,37 @@
         ::-webkit-scrollbar-thumb { background: #00ff4133; }
     </style>
 
-    <!-- Transformers.js — all models loaded from here -->
+    <!-- Stable v2 for text-generation and feature-extraction pipelines -->
     <script type="module">
-        import { pipeline, AutoProcessor, CLIPVisionModelWithProjection, RawImage }
-            from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@3.0.0-alpha.0';
-        window.AI = { pipeline, AutoProcessor, CLIPVisionModelWithProjection, RawImage };
+        try {
+            const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js');
+            window._pipeline = pipeline;
+            window._pipelineReady = true;
+            console.log('[Transformers v2] pipeline ready');
+        } catch(e) {
+            console.error('[Transformers v2] failed:', e);
+            window._pipelineReady = false;
+        }
+    </script>
+    <!-- Alpha v3 for CLIP vision classes (not available in v2 as named exports) -->
+    <script type="module">
+        try {
+            const mod = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@3.0.0-alpha.0');
+            window._clipReady = true;
+            window._AutoProcessor = mod.AutoProcessor;
+            window._CLIPVision = mod.CLIPVisionModelWithProjection;
+            window._RawImage = mod.RawImage;
+            // Also grab pipeline from v3 as fallback if v2 failed
+            if (!window._pipelineReady) {
+                window._pipeline = mod.pipeline;
+                window._pipelineReady = true;
+                console.log('[Transformers v3 fallback] pipeline ready');
+            }
+            console.log('[Transformers v3] CLIP classes ready');
+        } catch(e) {
+            console.error('[Transformers v3] failed:', e);
+            window._clipReady = false;
+        }
     </script>
 </head>
 <body>
@@ -353,7 +379,8 @@ let usingWhisper = false;
 async function initVoiceInput() {
     // Try loading Whisper-tiny first
     try {
-        whisperASR = await window.AI.pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
+        if (!window._pipeline) throw new Error("pipeline not available");
+        whisperASR = await window._pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny');
         usingWhisper = true;
         displayMessage("SYSTEM", "Voice input: Whisper-tiny loaded (local, private).");
     } catch(e) {
@@ -649,8 +676,131 @@ Choose ONE target and set a value within its allowed range.<|im_end|>
 };
 
 // ============================================================
-// MODULE 15A: GOAL ENGINE
+// MODULE 20: NEUROGENESIS & SYNAPTIC PRUNING
 // ============================================================
+
+const Neurogenesis = {
+    salienceHistory: [],       // rolling activity samples
+    birthThreshold:  0.35,     // activity level that triggers growth
+    pruneThreshold:  0.08,     // synapse weight below this gets pruned
+    maxNeurons:      120,
+    minNeurons:      40,
+    lastBirth:       0,        // cycle of last neuron birth
+    birthCooldown:   500,      // minimum cycles between births
+    totalBorn:       0,
+    totalPruned:     0,
+
+    tick() {
+        this.salienceHistory.push(brain.state.activityLevel);
+        if (this.salienceHistory.length > 60) this.salienceHistory.shift();
+
+        const avgActivity = this.salienceHistory.reduce((a,b)=>a+b,0) / this.salienceHistory.length;
+
+        // ── ACTIVITY-DRIVEN NEUROGENESIS ────────────────────────
+        const cooldownOk = (brain.cycle - this.lastBirth) > this.birthCooldown;
+        if (avgActivity > this.birthThreshold && cooldownOk && brain.neurons.length < this.maxNeurons) {
+            this.birthNeuron('activity');
+        }
+
+        // ── HEBBIAN SYNAPTOGENESIS ──────────────────────────────
+        // Co-firing neurons that don't share a synapse have a small chance of forming one
+        if (brain.cycle % 200 === 0) this.hebbianGrowth();
+
+        // ── SYNAPTIC PRUNING ────────────────────────────────────
+        if (brain.cycle % 300 === 0) this.prune();
+    },
+
+    birthNeuron(trigger) {
+        const id   = brain.neurons.length;
+        const type = Math.random() > 0.2 ? NeuronType.EXCITATORY : NeuronType.INHIBITORY;
+        const n    = new DigitalNeuron(id, type);
+
+        // Wire to recently active neurons (stronger integration)
+        const recentlyActive = brain.neurons
+            .filter(x => brain.cycle - x.lastSpikeTime < 50)
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 4);
+
+        // Connect from active neurons → new neuron
+        recentlyActive.forEach(src => {
+            src.synapses.push(new Synapse(n, Math.random() * 2 + 0.5, src.type));
+        });
+        // Connect new neuron → random targets in hidden/output layers
+        const targets = [...brain.hiddenLayer, ...brain.outputLayer]
+            .sort(() => Math.random() - 0.5).slice(0, 3);
+        targets.forEach(t => {
+            n.synapses.push(new Synapse(t, Math.random() * 2 + 0.5, n.type));
+        });
+
+        brain.neurons.push(n);
+        brain.hiddenLayer.push(n); // New neurons join hidden layer
+
+        this.lastBirth  = brain.cycle;
+        this.totalBorn++;
+
+        // Small dopamine boost — growth feels rewarding
+        Neurochemicals.dopamine = Math.min(1, Neurochemicals.dopamine + 0.04);
+
+        const strip = document.getElementById('mutation-log');
+        strip.innerHTML = `[${brain.cycle}] NEUROGENESIS (${trigger}): neuron #${id} born → ${brain.neurons.length} total\n` + strip.innerHTML;
+    },
+
+    // Goal-driven neurogenesis: LLM proposes which layer to grow
+    async goalDrivenBirth() {
+        if (!cortex || brain.neurons.length >= this.maxNeurons) return;
+        if ((brain.cycle - this.lastBirth) < this.birthCooldown) return;
+
+        const goal = GoalEngine.dominant();
+        const prompt =
+`<|im_start|>system
+You are deciding where to grow a new neuron. Current neurons: ${brain.neurons.length}. Active goal: ${goal.label}.
+Respond with ONLY one word: "input", "hidden", or "output".<|im_end|>
+<|im_start|>assistant
+`;
+        try {
+            const out = await cortex(prompt, { max_new_tokens: 5, temperature: 0.5 });
+            const choice = out[0].generated_text.split("assistant\n").pop()
+                .replace(/<\|im_end\|>/g,'').trim().toLowerCase().split(/\s/)[0];
+            if (['input','hidden','output'].includes(choice)) {
+                this.birthNeuron(`goal:${goal.id}→${choice}`);
+            }
+        } catch(e) { /* silent */ }
+    },
+
+    hebbianGrowth() {
+        // Find pairs that fired close together but have no direct synapse
+        const recentSpike = brain.neurons.filter(n => brain.cycle - n.lastSpikeTime < 30);
+        for (let i = 0; i < Math.min(recentSpike.length, 10); i++) {
+            for (let j = i+1; j < Math.min(recentSpike.length, 10); j++) {
+                const a = recentSpike[i], b = recentSpike[j];
+                const alreadyConnected = a.synapses.some(s => s.target === b);
+                if (!alreadyConnected && Math.random() < 0.15) {
+                    a.synapses.push(new Synapse(b, 0.5, a.type));
+                }
+            }
+        }
+    },
+
+    prune() {
+        let pruned = 0;
+        brain.neurons.forEach(n => {
+            const before = n.synapses.length;
+            n.synapses = n.synapses.filter(s => s.weight >= this.pruneThreshold);
+            pruned += before - n.synapses.length;
+        });
+        if (pruned > 0) {
+            this.totalPruned += pruned;
+            const strip = document.getElementById('mutation-log');
+            strip.innerHTML = `[${brain.cycle}] PRUNING: ${pruned} weak synapses removed\n` + strip.innerHTML;
+        }
+    },
+
+    summary() {
+        return `born:${this.totalBorn} pruned:${this.totalPruned} pop:${brain.neurons.length}`;
+    }
+};
+
+
 
 const GoalEngine = {
     drives: [
@@ -832,11 +982,13 @@ function animate() {
     brain.cycle++;
 
     GoalEngine.tick();
+    Neurogenesis.tick();
     handleAutonomy();
 
-    // Autonomous self-modification
+    // Autonomous self-modification + goal-driven neurogenesis
     if (brain.cycle % MutationEngine.mutationInterval === 0) {
         MutationEngine.proposeAndApply();
+        Neurogenesis.goalDrivenBirth();
     }
 
     let firingCount = 0, totalPotential = 0;
@@ -921,6 +1073,7 @@ function updateMonitor(firingCount) {
 ACTIVE: ${firingCount}/${brain.neurons.length}   AVG_VM: ${brain.state.avgPotential.toFixed(1)}mV
 CHEM:   D:${Neurochemicals.dopamine.toFixed(2)} S:${Neurochemicals.serotonin.toFixed(2)} C:${Neurochemicals.cortisol.toFixed(2)}
 STDP:   A+:${STDP.a_plus.toFixed(3)} A-:${STDP.a_minus.toFixed(3)} τ:${STDP.tau.toFixed(1)}
+NEURO:  ${Neurogenesis.summary()}
 GOAL:   [${g?.id||'---'}] urgency:${g?.urgency.toFixed(2)||'--'}
 CORTEX: ${cortexLine}
 STATE:  ${isDreaming?'DREAMING':'AWARE'} | MUT:${MutationEngine.log.length} | VM:${VectorMemory.traces.length}`;
@@ -1323,62 +1476,68 @@ function sysStatus(msg) {
 }
 
 async function initMultimodal() {
-    sysStatus("Waiting for Transformers.js module...");
+    sysStatus("Waiting for Transformers.js pipeline...");
 
-    // Wait for ES module to populate window.AI
-    try {
-        await new Promise((resolve, reject) => {
-            if (window.AI) return resolve();
-            let i = 0;
-            const poll = setInterval(() => {
-                if (window.AI) { clearInterval(poll); resolve(); }
-                else if (++i > 80) { clearInterval(poll); reject(new Error("window.AI never loaded — check CDN")); }
-            }, 200);
-        });
-    } catch(e) {
-        sysStatus("FATAL: Transformers.js failed to load. Check your internet connection.");
+    // Wait up to 20s for the stable v2 pipeline to be injected by the module script
+    await new Promise((resolve) => {
+        if (window._pipelineReady) return resolve();
+        let i = 0;
+        const poll = setInterval(() => {
+            if (window._pipelineReady) { clearInterval(poll); resolve(); }
+            else if (++i > 100) {
+                clearInterval(poll);
+                sysStatus("⚠ Still waiting... check browser console for import errors.");
+                resolve();
+            }
+        }, 200);
+    });
+
+    if (!window._pipeline) {
+        sysStatus("✗ FATAL: Transformers.js pipeline unavailable. Possible causes: ad-blocker blocking cdn.jsdelivr.net, no internet, or unsupported browser. She is in reflex-only mode.");
         return;
     }
 
     // ── SmolLM language cortex ──────────────────────────────────
-    sysStatus("Loading SmolLM-135M language cortex (~270MB, cached after first load)...");
+    sysStatus("Loading SmolLM-135M (~270MB, cached after first load)...");
     try {
-        cortex = await window.AI.pipeline('text-generation', 'Xenova/SmolLM-135M-Instruct');
-        sysStatus("✓ Language cortex online. She can now think.");
+        cortex = await window._pipeline('text-generation', 'Xenova/SmolLM-135M-Instruct');
+        sysStatus("✓ Language cortex ONLINE — she can now think.");
     } catch(e) {
-        sysStatus("✗ Language cortex failed — reflex mode only. Check console.");
+        sysStatus(`✗ SmolLM failed: ${e.message}`);
         console.error("SmolLM load error:", e);
-        // Don't return — continue loading other models
     }
 
     // ── MiniLM vector embedder ──────────────────────────────────
-    sysStatus("Loading MiniLM-L6 vector embedder (~23MB)...");
+    sysStatus("Loading MiniLM-L6 embedder (~23MB)...");
     try {
-        embedder = await window.AI.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-        sysStatus("✓ Vector memory online.");
+        embedder = await window._pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        sysStatus("✓ Vector memory ONLINE.");
     } catch(e) {
-        sysStatus("✗ Embedder failed — recency memory only.");
+        sysStatus(`✗ Embedder failed: ${e.message}`);
         console.error("MiniLM load error:", e);
     }
 
-    // ── CLIP visual thalamus ────────────────────────────────────
-    sysStatus("Loading CLIP visual thalamus (~170MB)...");
-    try {
-        clipProcessor  = await window.AI.AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch32');
-        visualThalamus = await window.AI.CLIPVisionModelWithProjection.from_pretrained('Xenova/clip-vit-base-patch32');
-        sysStatus("✓ Visual thalamus online.");
-        startWebcam();
-    } catch(e) {
-        sysStatus("✗ Vision unavailable.");
-        console.error("CLIP load error:", e);
+    // ── CLIP visual thalamus (v3 alpha exports) ─────────────────
+    if (window._clipReady) {
+        sysStatus("Loading CLIP visual thalamus (~170MB)...");
+        try {
+            clipProcessor  = await window._AutoProcessor.from_pretrained('Xenova/clip-vit-base-patch32');
+            visualThalamus = await window._CLIPVision.from_pretrained('Xenova/clip-vit-base-patch32');
+            sysStatus("✓ Visual thalamus ONLINE.");
+            startWebcam();
+        } catch(e) {
+            sysStatus(`✗ CLIP failed: ${e.message}`);
+            console.error("CLIP load error:", e);
+        }
+    } else {
+        sysStatus("✗ CLIP unavailable (v3 alpha did not load) — vision disabled.");
     }
 
     // ── Whisper voice input ─────────────────────────────────────
-    sysStatus("Loading Whisper-tiny voice recognition (~40MB)...");
+    sysStatus("Initializing voice input...");
     await initVoiceInput();
 
-    const cortexStatus = cortex ? "CORTEX:ONLINE" : "CORTEX:OFFLINE(REFLEX)";
-    sysStatus(`Boot complete. ${cortexStatus} — type to begin.`);
+    sysStatus(`Boot complete. CORTEX: ${cortex ? 'ONLINE' : 'OFFLINE — reflex mode'}.`);
 }
 
 async function startWebcam() {
